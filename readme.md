@@ -11,20 +11,24 @@ This project implements a semantic search API over arXiv metadata using sentence
 ```
 CS6675_Spring2025/
 ├── arxiv_dataset/                         # Raw arXiv metadata JSON snapshot (input source)
-│   └── arxiv-metadata-oai-snapshot.json  # Original arXiv JSON export
+│   └── arxiv-metadata-oai-snapshot.json        # Original arXiv JSON export
 ├── data/                                  # Preprocessed output used at runtime
-│   ├── merged.jsonl                       # All paper records in JSON Lines format
-│   ├── metadata.db                        # SQLite database of paper metadata (indexed by vector_idx)
-│   └── faiss_index.bin                    # FAISS index of paper embeddings
+│   ├── merged.jsonl                            # All paper records in JSON Lines format
+│   ├── metadata.db                             # SQLite database of paper metadata (indexed by vector_idx)
+│   └── faiss_index.bin                         # FAISS index of paper embeddings
 ├── scripts/                               # Data preparation and debug utilities
-│   ├── import_to_sqlite_with_index.py     # Build SQLite DB and vector_idx mapping
-│   └── test_search.py                     # Quick sanity check: FAISS→SQLite lookup
+│   ├── gen_requirements.py                     # Auto-generate minimal requirements.txt
+│   ├── import_to_sqlite_with_index.py          # Build SQLite DB and vector_idx mapping
+│   ├── merge_meta.py                           # Merge multiple metadata sources
+│   ├── preprocess.py                           # Preprocess raw arXiv JSON into usable format
+│   ├── test.py                                 # General test or debug script
 ├── src/                                   # Core service modules
-│   ├── data_loader.py                     # Lazy loader: FAISS index + metadata lookup
-│   ├── embedding_model.py                 # Query embedding (SentenceTransformer)
-│   ├── search_engine.py                   # FAISS search + metadata retrieval
-│   └── api.py                             # FastAPI REST endpoint (/search)
+│   ├── data_loader.py                          # Lazy loader: FAISS index + metadata lookup
+│   ├── embedding_model.py                      # Query embedding (SentenceTransformer)
+│   ├── search_engine.py                        # FAISS search + metadata retrieval
+│   └── api.py                                  # FastAPI REST endpoint (/search)
 └── requirements.txt                       # Minimal dependencies for deployment
+
 
 ```
 

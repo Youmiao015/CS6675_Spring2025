@@ -10,21 +10,22 @@ This project implements a semantic search API over arXiv metadata using sentence
 
 ```
 CS6675_Spring2025/
-├── data/
-│   ├── merged.jsonl
-│   ├── metadata.db
-│   └── faiss_index.bin
-├── scripts/
-│   ├── import_to_sqlite_with_index.py
-│   ├── test_search.py
-│   ├── preprocess.py
-│   └── merge_meta.py
-├── src/
-│   ├── data_loader.py
-│   ├── embedding_model.py
-│   ├── search_engine.py
-│   └── api.py
-└── requirements.txt
+├── arxiv_dataset/                         # Raw arXiv metadata JSON snapshot (input source)
+│   └── arxiv-metadata-oai-snapshot.json  # Original arXiv JSON export
+├── data/                                  # Preprocessed output used at runtime
+│   ├── merged.jsonl                       # All paper records in JSON Lines format
+│   ├── metadata.db                        # SQLite database of paper metadata (indexed by vector_idx)
+│   └── faiss_index.bin                    # FAISS index of paper embeddings
+├── scripts/                               # Data preparation and debug utilities
+│   ├── import_to_sqlite_with_index.py     # Build SQLite DB and vector_idx mapping
+│   └── test_search.py                     # Quick sanity check: FAISS→SQLite lookup
+├── src/                                   # Core service modules
+│   ├── data_loader.py                     # Lazy loader: FAISS index + metadata lookup
+│   ├── embedding_model.py                 # Query embedding (SentenceTransformer)
+│   ├── search_engine.py                   # FAISS search + metadata retrieval
+│   └── api.py                             # FastAPI REST endpoint (/search)
+└── requirements.txt                       # Minimal dependencies for deployment
+
 ```
 
 ## Setup

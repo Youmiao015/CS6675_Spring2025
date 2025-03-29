@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     from tqdm import tqdm
     for topic in tqdm(topic_list, desc="Processing topics"):
-        res = search_engine.search(topic, top_k=100000, threshold=threshold)
+        res = search_engine.search(topic, top_k=500000, threshold=threshold)
         for result in res['results']:
             results_list.append({
                 'topic': topic,
@@ -48,5 +48,20 @@ if __name__ == "__main__":
 
     output_file = 'full_dataset.csv'
     dataset = pd.DataFrame(results_list)
+
     dataset.to_csv(output_file, index=False)
     print(f"Dataset saved to {output_file}")
+
+    dataset['year'] = pd.to_datetime(dataset['update_date']).dt.year
+    
+    agg_table = pd.pivot_table(
+        dataset,
+        values='id',
+        index='topic',
+        columns='year',
+        aggfunc='count',
+        fill_value=0
+    )
+    
+    agg_table.to_csv('topic_year_counts.csv')
+    print(f"Topic-year counts saved to topic_year_counts.csv")

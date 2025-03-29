@@ -1,0 +1,6 @@
+data/
+topics/
+arxiv_dataset/
+full_dataset.csv
+*.pyc
+.DS_Store

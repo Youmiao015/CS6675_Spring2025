@@ -28,7 +28,7 @@ class SearchEngine:
 
         # Set a large initial k if threshold is specified to ensure we get enough candidates
         # We need a large enough value to potentially find all matches that meet the threshold
-        initial_k = 100000 if threshold is not None else top_k
+        initial_k = 500000 if threshold is not None else top_k
         
         # Retrieve nearest neighbors from FAISS index
         distances, indices = self.index.search(query_vector, initial_k)

@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     from tqdm import tqdm
     for topic in tqdm(topic_list, desc="Processing topics"):
-        res = search_engine.search(topic, top_k=500000, threshold=threshold)
+        res = search_engine.search(topic, threshold=threshold)
         for result in res['results']:
             results_list.append({
                 'topic': topic,

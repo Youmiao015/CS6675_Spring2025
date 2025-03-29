@@ -29,9 +29,9 @@ class DataLoader:
         conn = self.connect_db()
         cur = conn.cursor()
         cur.execute(
-            "SELECT id, title, abstract FROM papers WHERE vector_idx = ?",
+            "SELECT id, title, abstract, update_date FROM papers WHERE vector_idx = ?",
             (int(idx),)     # cast FAISS idx to Python int
         )
         row = cur.fetchone()
-        return {} if row is None else {"id": row[0], "title": row[1], "abstract": row[2]}
+        return {} if row is None else {"id": row[0], "title": row[1], "abstract": row[2], "update_date": row[3]}
 

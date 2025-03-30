@@ -123,3 +123,13 @@ Sample Output:
   }
 }
 ```
+
+# Generate research areas with LLM
+This step was performed on PACE ICE. To perform this step, first install required conda environment using `/other_requirements/generate_areas_llm_environment.yml`. Then, you can run the following two commands:
+```
+python scripts/process_clusters.py \
+    --num_areas 3 \
+    --input_file data/step5_hdbscan_umap_clusters.json \
+    --output_file data/cluster_dict_with_llm_generated_areas.json
+python scripts/compile_research_areas.py
+```

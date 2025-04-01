@@ -69,7 +69,7 @@ python import_to_sqlite_with_index.py
 
 ```bash
 cd src
-uvicorn api:app --reload --host 0.0.0.0 --port 8000
+uvicorn api.api:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Example Query

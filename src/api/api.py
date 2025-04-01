@@ -3,9 +3,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
 
-from data_loader import DataLoader
-from embedding_model import EmbeddingModel
-from search_engine import SearchEngine
+from search.data_loader import DataLoader
+from search.embedding_model import EmbeddingModel
+from search.search_engine import SearchEngine
 
 # Paths to pre‑built FAISS index and SQLite metadata
 INDEX_FILE = "../data/faiss_index.bin"

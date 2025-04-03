@@ -7,11 +7,11 @@ from search.data_loader import DataLoader
 from search.embedding_model import EmbeddingModel
 from search.search_engine import SearchEngine
 
-# Paths to pre‑built FAISS index and SQLite metadata
-INDEX_FILE = "../data/faiss_index.bin"
-DB_FILE    = "../data/metadata.db"
+# Paths to pre-built FAISS index and SQLite metadata (vector DB with title and abstract only)
+INDEX_FILE = "../data/faiss_index_cosine.bin"
+DB_FILE    = "../data/vector_data.db"
 
-# Initialize DataLoader (no full metadata load)
+# Initialize DataLoader
 loader = DataLoader(index_path=INDEX_FILE, db_path=DB_FILE)
 
 try:
@@ -19,10 +19,10 @@ try:
 except Exception as e:
     raise RuntimeError(f"Failed to load FAISS index: {e}")
 
-# Initialize embedding model (auto‑select GPU if available)
-embedding_model = EmbeddingModel(model_name="all-MiniLM-L6-v2")
+# Initialize embedding model using "allenai-specter" (specialized for scientific papers)
+embedding_model = EmbeddingModel(model_name="allenai-specter")
 
-# Initialize SearchEngine with DataLoader (not a full metadata list)
+# Initialize SearchEngine with DataLoader and embedding model
 search_engine = SearchEngine(index=index, data_loader=loader, embedding_model=embedding_model)
 
 app = FastAPI()
@@ -33,6 +33,7 @@ class SearchRequest(BaseModel):
 
 @app.post("/search")
 def search(request: SearchRequest):
+    # Validate the query is not empty
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     return search_engine.search(request.query, top_k=request.top_k)

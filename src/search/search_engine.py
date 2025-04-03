@@ -18,43 +18,43 @@ class SearchEngine:
         
         :param query: The user's input string.
         :param top_k: Number of similar results to return. This is ignored if threshold is specified.
-        :param threshold: Optional similarity threshold (lower is more similar). 
-                         Only results with distance <= threshold will be returned.
-                         When specified, all results meeting the threshold will be returned regardless of top_k.
+        :param threshold: Optional similarity threshold (higher is more similar). 
+                          Only results with similarity >= threshold will be returned.
+                          When specified, all results meeting the threshold will be returned regardless of top_k.
         :return: A dictionary containing a list of result records and aggregated metrics.
         """
-        # Convert query to vector
+        # Convert query to vector and normalize (as done during index construction)
         query_vector = np.array(self.model.encode(query), dtype='float32').reshape(1, -1)
+        norms = np.linalg.norm(query_vector, axis=1, keepdims=True)
+        query_vector = query_vector / norms
 
         # Set a large initial k if threshold is specified to ensure we get enough candidates
-        # We need a large enough value to potentially find all matches that meet the threshold
         initial_k = 500000 if threshold is not None else top_k
         
         # Retrieve nearest neighbors from FAISS index
         distances, indices = self.index.search(query_vector, initial_k)
 
         results = []
-        for distance, idx in zip(distances[0], indices[0]):
-            # Skip results that don't meet the threshold
-            if threshold is not None and distance > threshold:
+        for similarity, idx in zip(distances[0], indices[0]):
+            # Skip results that don't meet the similarity threshold
+            if threshold is not None and similarity < threshold:
                 continue
                 
             record = self.loader.get_metadata(idx)
             if not record:
                 continue
-            record['distance'] = float(distance)
+            record['similarity'] = float(similarity)
             results.append(record)
             
             # Stop once we have top_k results (if no threshold is set)
             if threshold is None and len(results) >= top_k:
                 break
 
-
-        avg_distance = float(np.mean([r['distance'] for r in results])) if results else None
+        avg_similarity = float(np.mean([r['similarity'] for r in results])) if results else None
         return {
             'results': results,
             'aggregated_metrics': {
-                'avg_distance': avg_distance,
+                'avg_similarity': avg_similarity,
                 'result_count': len(results)
             }
         }

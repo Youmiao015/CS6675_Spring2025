@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Paper Search and Model Prediction</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <!-- Simple navigation bar (optional) -->
+    <nav class="navbar">
+      <div class="navbar-logo">Paper Trend Predictor</div>
+    </nav>
+    
+    <!-- Main heading and subtitle -->
+    <h1>Paper Search and Model Prediction</h1>
+    <p class="subtitle">
+      Quickly discover relevant papers and get an estimated trend prediction.
+    </p>
+  </header>
+
+  <main>
+    <!-- Search section -->
+    <section id="search-section">
+      <h2>Search</h2>
+      <div class="search-container">
+        <input type="text" id="search-input" placeholder="Enter a topic" />
+        <button id="search-button">Search</button>
+      </div>
+    </section>
+
+    <!-- Results section -->
+    <section id="results-section">
+      <h2>Search Results</h2>
+      <div id="search-results"></div>
+    </section>
+
+    <!-- Prediction results section -->
+    <section id="prediction-section">
+      <h2>Model Prediction Results</h2>
+      <div id="prediction-result"></div>
+    </section>
+  </main>
+
+  <!-- Simple footer -->
+  <footer>
+    <p>© 2025 PaperTrend. All rights reserved.</p>
+  </footer>
+
+  <!-- Load scripts -->
+  <script src="api.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

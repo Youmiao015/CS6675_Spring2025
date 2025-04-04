@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
@@ -26,6 +27,15 @@ embedding_model = EmbeddingModel(model_name="all-MiniLM-L6-v2")
 search_engine = SearchEngine(index=index, data_loader=loader, embedding_model=embedding_model)
 
 app = FastAPI()
+
+# 添加 CORS 中间件，允许所有来源的请求
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],         # 可根据需要指定具体域名，例如 ["http://localhost:3000"]
+    allow_credentials=True,
+    allow_methods=["*"],         # 允许所有请求方法，如 GET, POST, OPTIONS 等
+    allow_headers=["*"],
+)
 
 class SearchRequest(BaseModel):
     query: str

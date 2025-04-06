@@ -203,7 +203,7 @@ def main():
             continue
             
         processed_count += 1
-        if processed_count % 10 == 0:
+        if processed_count % 100 == 0:
             print(f"Processed {processed_count} CS papers so far")
         
         # Download PDF to temporary file
@@ -228,9 +228,6 @@ def main():
                 
                 # Save to processed papers file
                 save_processed_paper(processed_file, arxiv_id)
-                
-                if success_count >= 2:
-                    break
             else:
                 print(f"No discussion section found for {arxiv_id}")
                 # Still mark as processed even if no discussion found

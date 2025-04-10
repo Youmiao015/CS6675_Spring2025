@@ -4,3 +4,5 @@ arxiv_dataset/
 full_dataset.csv
 *.pyc
 .DS_Store
+models/e5_optuna_study/worker_*
+*.pth

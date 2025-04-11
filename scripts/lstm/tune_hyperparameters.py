@@ -6,7 +6,7 @@ import json
 import datetime
 import argparse
 from types import SimpleNamespace
-from lstm_late_fusion import run_pipeline, parse_args, get_text_model_name, get_text_dim
+from lstm_sliding_window import run_pipeline, parse_args, get_text_model_name, get_text_dim
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='Hyperparameter Tuning for LSTM Late Fusion Model')

@@ -2,77 +2,86 @@
 import argparse
 import torch
 import numpy as np
+import pandas as pd
 import json
 import os
+from datetime import datetime
 from transformers import AutoTokenizer, AutoModel
 from pathlib import Path
 
-# Parse command line arguments
+# Import necessary components from lstm_late_fusion.py
+from lstm_late_fusion import (
+    TimeSeriesTextDataset, 
+    TimeSeriesWithTextModel, 
+    preprocess_time_series, 
+    preprocess_target,
+    get_text_model_name,
+    get_text_dim
+)
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Predict using a trained LSTM Late Fusion Model')
-    parser.add_argument('--model_dir', type=str, required=True,
-                        help='Directory containing the trained model and config file')
-    parser.add_argument('--topic', type=str, 
-                        help='CS topic to predict popularity for')
-    parser.add_argument('--popularity_sequence', type=str,
-                        help='Comma-separated sequence of topic popularity values for years 2007-2023 (17 values)')
-    parser.add_argument('--input_json', type=str,
-                        help='JSON file containing multiple prediction inputs')
-    parser.add_argument('--output_json', type=str, default='predictions.json',
-                        help='Output JSON file to save predictions')
-    parser.add_argument('--gpu_id', type=int, default=None,
-                        help='GPU ID to use (if None, will use CPU)')
+    parser.add_argument('--model_path', type=str, required=True,
+                        help='Path to the model checkpoint file (.pth)')
+    parser.add_argument('--params_path', type=str, required=True,
+                        help='Path to the parameters JSON file (e.g., config_*.json from Optuna trial)')
+    parser.add_argument('--input_csv', type=str, required=True,
+                        help='Path to the input CSV file with data from 2007-2023')
+    parser.add_argument('--output_csv', type=str, default='predictions.csv',
+                        help='Output CSV file to save predictions')
+    parser.add_argument('--gpu_id', type=int, default=-1,
+                        help='GPU ID to use (if -1, will use CPU)')
     return parser.parse_args()
 
 # Load model configuration
-def load_config(model_dir):
-    config_files = list(Path(model_dir).glob('config_*.json'))
-    if not config_files:
-        raise FileNotFoundError(f"No config file found in {model_dir}")
+def load_params(params_path):
+    """Load parameters from a JSON file."""
+    if not os.path.exists(params_path):
+        raise FileNotFoundError(f"Parameters file not found: {params_path}")
     
-    # Sort by timestamp (newest first)
-    config_files.sort(key=lambda x: x.name, reverse=True)
-    config_path = config_files[0]
+    with open(params_path, 'r') as f:
+        params = json.load(f)
     
-    with open(config_path, 'r') as f:
-        config = json.load(f)
+    # Check if this is an Optuna study config file
+    if 'text_model_name' in params and 'seq_len' in params:
+        # This is already in the correct format
+        config = params
+    else:
+        # Create a config dictionary with the necessary fields
+        config = {
+            'preprocessing': params.get('preprocessing', 'log1p'),
+            'embedding_model': params.get('embedding_model', 'e5'),
+            'lstm_hidden_dim': params.get('lstm_hidden_dim', 64),
+            'fc_hidden_dim': params.get('fc_hidden_dim', 64),
+            'dropout_rate': params.get('dropout_rate', 0.3),
+            'text_model_name': get_text_model_name(params.get('embedding_model', 'e5')),
+            'text_dim': get_text_dim(params.get('embedding_model', 'e5'))
+        }
     
     return config
 
 # Load model
-def load_model(model_dir, config):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    # Find model file
-    model_files = list(Path(model_dir).glob('model_*.pth'))
-    if not model_files:
-        raise FileNotFoundError(f"No model file found in {model_dir}")
-    
-    # Sort by timestamp (newest first)
-    model_files.sort(key=lambda x: x.name, reverse=True)
-    model_path = model_files[0]
+def load_model(model_path, config, device):
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found: {model_path}")
     
     # Create model
-    from lstm_late_fusion import TimeSeriesWithTextModel
-    
     model = TimeSeriesWithTextModel(
         ts_input_dim=1,
         lstm_hidden_dim=config['lstm_hidden_dim'],
         text_dim=config['text_dim'],
         fc_hidden_dim=config['fc_hidden_dim'],
-        dropout_rate=config['dropout_rate']
+        dropout_rate=config.get('dropout_rate', config.get('drop_out', 0.3))
     ).to(device)
     
     # Load state dict
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
     
-    return model, device
+    return model
 
 # Load tokenizer and text model
-def load_text_model(config):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+def load_text_model(config, device):
     # Load tokenizer and text model
     text_model_name = config['text_model_name']
     tokenizer = AutoTokenizer.from_pretrained(text_model_name)
@@ -80,151 +89,115 @@ def load_text_model(config):
     text_model.eval()
     text_model.to(device)
     
-    return tokenizer, text_model, device
+    return tokenizer, text_model
 
-# Preprocess time series data
-def preprocess_time_series(data, preprocessing_type):
-    data = np.array(data).reshape(1, -1)  # Reshape to [1, seq_len]
+# Load data from CSV
+def load_data_from_csv(file_path, preprocessing_type):
+    """Load and preprocess data from CSV file."""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Data file not found: {file_path}")
     
-    if preprocessing_type == 'log':
-        # Apply log1p transformation
-        data = np.log1p(data)
+    # Read CSV file
+    df = pd.read_csv(file_path)
     
-    # Min-max scaling to [0, 1] for each row (time series)
-    data_min = data.min(axis=1, keepdims=True)
-    data_max = data.max(axis=1, keepdims=True)
-    data_scaled = (data - data_min) / (data_max - data_min + 1e-8)
+    # Extract topics and time series data
+    topics = df['topic'].tolist()
     
-    # Reshape to [1, seq_len, 1] for LSTM
-    data_reshaped = data_scaled.reshape(data_scaled.shape[0], data_scaled.shape[1], 1)
+    # Extract years from 2007 to 2023 for input
+    years_input = [str(year) for year in range(2007, 2024)]
     
-    return data_reshaped
+    # Prepare time series data
+    ts_data = df[years_input].values
+    
+    # Apply preprocessing to input data
+    ts_data_processed = preprocess_time_series(ts_data, preprocessing_type)
+    
+    # Reshape to (n_samples, seq_len, 1) for LSTM
+    ts_data_reshaped = ts_data_processed.reshape(ts_data_processed.shape[0], ts_data_processed.shape[1], 1)
+    
+    return ts_data_reshaped, topics
 
-# Get text embedding
-def get_text_embedding(text, tokenizer, text_model, device, embedding_model):
-    with torch.no_grad():
-        if embedding_model == 'distilbert':
-            encoded = tokenizer(text, return_tensors='pt', truncation=True, padding=True)
-            encoded = {k: v.to(device) for k, v in encoded.items()}
-            output = text_model(**encoded)
-            text_vector = output.last_hidden_state[:, 0, :]  # CLS token
-        else:  # E5 model
-            # For E5, we need to add a prefix to the text
-            encoded = tokenizer(f"passage: {text}", return_tensors='pt', truncation=True, padding=True)
-            encoded = {k: v.to(device) for k, v in encoded.items()}
-            output = text_model(**encoded)
-            text_vector = output.last_hidden_state[:, 0, :]  # CLS token
-        
-    return text_vector
-
-# Make prediction
-def predict(model, tokenizer, text_model, config, topic, popularity_sequence, device):
-    # Process time series data
-    ts_data = preprocess_time_series(popularity_sequence, config['preprocessing'])
-    ts_tensor = torch.tensor(ts_data, dtype=torch.float32).to(device)
+# Make predictions
+def predict(model, tokenizer, text_model, config, ts_data, topics, device):
+    # Create dataset
+    dataset = TimeSeriesTextDataset(
+        ts_data, topics, [0] * len(topics),  # Dummy targets since we're just predicting
+        tokenizer, text_model, device, 
+        config['embedding_model']
+    )
     
-    # Process text data
-    text_vector = get_text_embedding(topic, tokenizer, text_model, device, config['embedding_model'])
+    # Create dataloader
+    dataloader = torch.utils.data.DataLoader(
+        dataset, 
+        batch_size=32,  # Adjust batch size as needed
+        shuffle=False
+    )
     
-    # Make prediction
-    with torch.no_grad():
-        prediction = model(ts_tensor, text_vector).item()
-    
-    # Convert prediction back to original scale
-    original_prediction = np.expm1(prediction)
-    
-    return {
-        'topic': topic,
-        'prediction_log_scale': prediction,
-        'prediction': original_prediction,
-        'input_sequence': popularity_sequence
-    }
-
-# Process input JSON file
-def process_json_input(input_file, model, tokenizer, text_model, config, device):
-    with open(input_file, 'r') as f:
-        inputs = json.load(f)
-    
+    # Make predictions
     predictions = []
-    for input_data in inputs:
-        topic = input_data.get('topic')
-        popularity_sequence = input_data.get('popularity_sequence')
-        
-        if not topic or not popularity_sequence:
-            print(f"Skipping invalid input: {input_data}")
-            continue
-        
-        # Convert popularity_sequence to list of floats if it's a string
-        if isinstance(popularity_sequence, str):
-            popularity_sequence = [float(x) for x in popularity_sequence.split(',')]
-        
-        # Ensure we have 17 values (2007-2023)
-        if len(popularity_sequence) != 17:
-            print(f"Warning: Expected 17 values for years 2007-2023, got {len(popularity_sequence)}. Skipping.")
-            continue
-        
-        prediction = predict(model, tokenizer, text_model, config, topic, popularity_sequence, device)
-        predictions.append(prediction)
+    with torch.no_grad():
+        for batch in dataloader:
+            ts_batch, text_vec_batch, _ = batch
+            ts_batch = ts_batch.to(device)
+            text_vec_batch = text_vec_batch.to(device)
+            
+            output = model(ts_batch, text_vec_batch)
+            predictions.extend(output.cpu().numpy())
     
-    return predictions
+    # Convert predictions back to original scale
+    original_predictions = np.expm1(predictions)
+    
+    return predictions, original_predictions
 
 def main():
     args = parse_args()
     
     # Set device
-    if args.gpu_id is not None and torch.cuda.is_available():
+    if torch.cuda.is_available() and args.gpu_id >= 0:
         device = torch.device(f'cuda:{args.gpu_id}')
-        torch.cuda.set_device(device)
-        print(f"Using GPU {args.gpu_id}: {torch.cuda.get_device_name(args.gpu_id)}")
+        print(f"Using GPU: {device}")
     else:
         device = torch.device('cpu')
         print("Using CPU")
     
-    # Load config
-    config = load_config(args.model_dir)
-    print(f"Loaded config from {args.model_dir}")
+    # Load parameters
+    config = load_params(args.params_path)
+    print(f"Loaded parameters from {args.params_path}")
+    print(f"Preprocessing: {config.get('preprocessing', 'log1p')}")
+    print(f"Embedding model: {config.get('embedding_model', 'e5')}")
+    print(f"Text model: {config.get('text_model_name', 'intfloat/multilingual-e5-large-instruct')}")
     
     # Load model
-    model, _ = load_model(args.model_dir, config)
-    print("Model loaded successfully")
+    model = load_model(args.model_path, config, device)
+    print(f"Model loaded from {args.model_path}")
     
     # Load tokenizer and text model
-    tokenizer, text_model, _ = load_text_model(config)
+    tokenizer, text_model = load_text_model(config, device)
     print(f"Text model loaded: {config['text_model_name']}")
     
-    results = []
+    # Load data from CSV
+    ts_data, topics = load_data_from_csv(args.input_csv, config['preprocessing'])
+    print(f"Loaded data from {args.input_csv}: {len(topics)} samples")
     
-    # Process input JSON if provided
-    if args.input_json:
-        results = process_json_input(args.input_json, model, tokenizer, text_model, config, device)
-        print(f"Processed {len(results)} inputs from {args.input_json}")
+    # Make predictions
+    log_predictions, original_predictions = predict(model, tokenizer, text_model, config, ts_data, topics, device)
     
-    # Process single prediction if provided
-    elif args.topic and args.popularity_sequence:
-        # Convert popularity sequence to list of floats
-        popularity_sequence = [float(x) for x in args.popularity_sequence.split(',')]
-        
-        # Ensure we have 17 values (2007-2023)
-        if len(popularity_sequence) != 17:
-            raise ValueError(f"Expected 17 values for years 2007-2023, got {len(popularity_sequence)}")
-        
-        result = predict(model, tokenizer, text_model, config, args.topic, popularity_sequence, device)
-        results.append(result)
-        
-        # Print result
-        print(f"\nPrediction for topic '{args.topic}':")
-        print(f"2024 popularity prediction: {result['prediction']:.2f}")
-        print(f"Log-scale prediction: {result['prediction_log_scale']:.4f}")
+    # Create output DataFrame
+    output_df = pd.DataFrame({
+        'topic': topics,
+        '2024': original_predictions
+    })
     
-    else:
-        print("No input provided. Please specify --topic and --popularity_sequence, or --input_json")
-        return
+    # Save to CSV
+    output_df.to_csv(args.output_csv, index=False)
+    print(f"Predictions saved to {args.output_csv}")
     
-    # Save results to output file
-    with open(args.output_json, 'w') as f:
-        json.dump(results, f, indent=2)
-    
-    print(f"Results saved to {args.output_json}")
+    # Print example predictions
+    print("\nExample predictions:")
+    for i in range(min(5, len(topics))):
+        print(f"Topic: {topics[i]}")
+        print(f"Predicted 2024 value: {original_predictions[i]:.2f}")
+        print("---")
 
 if __name__ == "__main__":
     main() 

@@ -10,28 +10,31 @@ import argparse
 import json
 import datetime
 import time
+from data_utils import load_data_from_csv_sliding, create_data_loaders, load_data_from_csv_no_sliding
 
 # Define the argument parser function
 def parse_args():
     parser = argparse.ArgumentParser(description='LSTM Late Fusion for Time Series Prediction')
     parser.add_argument('--preprocessing', type=str, choices=['log', 'minmax'], default='minmax',
                         help='Preprocessing method: "log" for log1p + min-max scaling, "minmax" for just min-max scaling')
-    parser.add_argument('--embedding_model', type=str, choices=['distilbert', 'e5'], default='distilbert',
+    parser.add_argument('--embedding_model', type=str, choices=['distilbert', 'e5'], default='e5',
                         help='Embedding model to use: "distilbert" for distilbert-base-uncased, "e5" for intfloat/multilingual-e5-large-instruct')
     parser.add_argument('--lstm_hidden_dim', type=int, default=64, help='Hidden dimension of LSTM')
-    parser.add_argument('--fc_hidden_dim', type=int, default=128, help='Hidden dimension of fully connected layers')
+    parser.add_argument('--fc_hidden_dim', type=int, default=64, help='Hidden dimension of fully connected layers')
     parser.add_argument('--dropout_rate', type=float, default=0.3, help='Dropout rate')
-    parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
+    parser.add_argument('--batch_size', type=int, default=16, help='Batch size')
     parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
-    parser.add_argument('--learning_rate', type=float, default=1e-3, help='Learning rate')
-    parser.add_argument('--weight_decay', type=float, default=0.0, help='Weight decay for optimizer')
-    parser.add_argument('--early_stopping_patience', type=int, default=5, help='Patience for early stopping')
+    parser.add_argument('--learning_rate', type=float, default=0.00433, help='Learning rate')
+    parser.add_argument('--weight_decay', type=float, default=9.3385e-06, help='Weight decay for optimizer')
+    parser.add_argument('--early_stopping_patience', type=int, default=7, help='Patience for early stopping')
     parser.add_argument('--output_dir', type=str, default='models', help='Directory to save models and results')
     parser.add_argument('--disable_progress_bar', action='store_true', help='Disable tqdm progress bars')
+    parser.add_argument('--window_size', type=int, default=12, help='Window size')
+    parser.add_argument('--features', type=str, nargs='+', default=['year_index', 'pct_change', 'slope'],
+                        help='Additional features to include in LSTM input. Available features: year_index, pct_change, slope')
     return parser.parse_args()
 
 # Define global variables that will be used by functions
-SEQ_LEN = 17  # Years from 2007 to 2023 (excluding 2024 which is the target)
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Function to get text model name based on embedding model
@@ -42,49 +45,11 @@ def get_text_model_name(embedding_model):
 def get_text_dim(embedding_model):
     return 768 if embedding_model == 'distilbert' else 1024  # E5-large has 1024 dimensions
 
-# Custom Dataset
-class TimeSeriesTextDataset(Dataset):
-    def __init__(self, ts_data, text_data, targets, tokenizer, bert_model, device, embedding_model):
-        self.ts_data = ts_data
-        self.text_data = text_data
-        self.targets = targets
-        self.tokenizer = tokenizer
-        self.bert_model = bert_model
-        self.device = device
-        self.embedding_model = embedding_model
-
-    def __len__(self):
-        return len(self.ts_data)
-
-    def __getitem__(self, idx):
-        ts = torch.tensor(self.ts_data[idx], dtype=torch.float32)  # (seq_len, features)
-        text = self.text_data[idx]
-        target = torch.tensor(self.targets[idx], dtype=torch.float32)
-        
-        # Tokenize + Embed text
-        with torch.no_grad():
-            if self.embedding_model == 'distilbert':
-                encoded = self.tokenizer(text, return_tensors='pt', truncation=True, padding=True)
-                # Move encoded tensors to the same device as the model
-                encoded = {k: v.to(self.device) for k, v in encoded.items()}
-                output = self.bert_model(**encoded)
-                text_vector = output.last_hidden_state[:, 0, :].squeeze(0)  # CLS token
-            else:  # E5 model
-                # For E5, we need to add a prefix to the text
-                encoded = self.tokenizer(f"passage: {text}", return_tensors='pt', truncation=True, padding=True)
-                encoded = {k: v.to(self.device) for k, v in encoded.items()}
-                output = self.bert_model(**encoded)
-                text_vector = output.last_hidden_state[:, 0, :].squeeze(0)  # CLS token
-            
-            # Move text_vector back to CPU for the DataLoader
-            text_vector = text_vector.cpu()
-
-        return ts, text_vector, target
-
 # Model
 class TimeSeriesWithTextModel(nn.Module):
     def __init__(self, ts_input_dim, lstm_hidden_dim, text_dim, fc_hidden_dim, dropout_rate):
         super().__init__()
+        # ts_input_dim is now 2 (1 for time series value + 1 for year index)
         self.lstm = nn.LSTM(ts_input_dim, lstm_hidden_dim, batch_first=True)
         self.fc1 = nn.Linear(lstm_hidden_dim + text_dim, fc_hidden_dim)
         self.fc2 = nn.Linear(fc_hidden_dim, 1)
@@ -98,67 +63,6 @@ class TimeSeriesWithTextModel(nn.Module):
         x = self.dropout(x)
         output = self.fc2(x)
         return output.squeeze(-1)
-
-# Function to preprocess time series data
-def preprocess_time_series(data, preprocessing_type):
-    if preprocessing_type == 'log':
-        # Apply log1p transformation
-        data = np.log1p(data)
-    
-    # Min-max scaling to [0, 1] for each row (time series)
-    data_min = data.min(axis=1, keepdims=True)
-    data_max = data.max(axis=1, keepdims=True)
-    data_scaled = (data - data_min) / (data_max - data_min + 1e-8)
-    
-    return data_scaled
-
-# Function to apply log1p to target values
-def preprocess_target(target_values):
-    return np.log1p(target_values)
-
-# Function to load and preprocess data from CSV
-def load_data_from_csv(file_path, preprocessing_type):
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Data file not found: {file_path}")
-    
-    # Read CSV file
-    df = pd.read_csv(file_path)
-    
-    # Extract topics and time series data
-    topics = df['topic'].tolist()
-    
-    # Extract years from 2007 to 2023 for input, and 2024 as target
-    years_input = [str(year) for year in range(2007, 2024)]
-    year_target = '2024'
-    
-    # Prepare time series data
-    ts_data = df[years_input].values
-    targets = df[year_target].values
-    
-    # Apply preprocessing to input data
-    ts_data_processed = preprocess_time_series(ts_data, preprocessing_type)
-    
-    # Always apply log1p to target values
-    targets_processed = preprocess_target(targets)
-    
-    # Reshape to (n_samples, seq_len, 1) for LSTM
-    ts_data_reshaped = ts_data_processed.reshape(ts_data_processed.shape[0], ts_data_processed.shape[1], 1)
-    
-    return ts_data_reshaped, topics, targets_processed
-
-# Function to create data loaders
-def create_data_loaders(train_ts, train_texts, train_targets, val_ts, val_texts, val_targets, 
-                        test_ts, test_texts, test_targets, tokenizer, bert_model, device, 
-                        embedding_model, batch_size):
-    train_dataset = TimeSeriesTextDataset(train_ts, train_texts, train_targets, tokenizer, bert_model, device, embedding_model)
-    val_dataset = TimeSeriesTextDataset(val_ts, val_texts, val_targets, tokenizer, bert_model, device, embedding_model)
-    test_dataset = TimeSeriesTextDataset(test_ts, test_texts, test_targets, tokenizer, bert_model, device, embedding_model)
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size)
-    
-    return train_loader, val_loader, test_loader
 
 # Function to train the model
 def train_model(model, train_loader, val_loader, criterion, optimizer, device, epochs, early_stopping_patience, output_dir, timestamp, disable_progress_bar=False):
@@ -256,16 +160,27 @@ def evaluate_model(model, test_loader, criterion, device):
     mae = float(np.mean(np.abs(predictions - actuals)))  # Convert to Python float
     r2 = float(1 - np.sum((actuals - predictions) ** 2) / np.sum((actuals - np.mean(actuals)) ** 2))  # Convert to Python float
 
-    print(f"Test MSE: {mse:.2f}")
-    print(f"Test RMSE: {rmse:.2f}")
-    print(f"Test MAE: {mae:.2f}")
-    print(f"Test R²: {r2:.4f}")
+    print(f"Test MSE (log scale): {mse:.2f}")
+    print(f"Test RMSE (log scale): {rmse:.2f}")
+    print(f"Test MAE (log scale): {mae:.2f}")
+    print(f"Test R² (log scale): {r2:.4f}")
 
     # Convert predictions back to original scale for display
     original_predictions = np.expm1(predictions)
     original_actuals = np.expm1(actuals)
     
-    return avg_test_loss, mse, rmse, mae, r2, predictions, actuals, original_predictions, original_actuals
+    # Calculate metrics in original scale
+    original_mse = float(np.mean((original_predictions - original_actuals) ** 2))
+    original_rmse = float(np.sqrt(original_mse))
+    original_mae = float(np.mean(np.abs(original_predictions - original_actuals)))
+    original_r2 = float(1 - np.sum((original_actuals - original_predictions) ** 2) / np.sum((original_actuals - np.mean(original_actuals)) ** 2))
+    
+    print(f"Test MSE (original scale): {original_mse:.2f}")
+    print(f"Test RMSE (original scale): {original_rmse:.2f}")
+    print(f"Test MAE (original scale): {original_mae:.2f}")
+    print(f"Test R² (original scale): {original_r2:.4f}")
+    
+    return avg_test_loss, mse, rmse, mae, r2, predictions, actuals, original_predictions, original_actuals, original_mse, original_rmse, original_mae, original_r2
 
 # Function to save results
 def save_results(results, output_dir, timestamp):
@@ -305,15 +220,36 @@ def run_pipeline(args, config_file, timestamp, disable_progress_bar=False):
     bert_model.eval()  # Freeze weights
     bert_model.to(DEVICE)
 
-    # Load data from CSV files
-    print("Loading data from CSV files...")
-    train_ts, train_texts, train_targets = load_data_from_csv('data/train_data_new.csv', args.preprocessing)
-    val_ts, val_texts, val_targets = load_data_from_csv('data/val_data_new.csv', args.preprocessing)
-    test_ts, test_texts, test_targets = load_data_from_csv('data/test_data_new.csv', args.preprocessing)
+    # Define window size
+    window_size = args.window_size
 
-    print(f"Train data: {len(train_ts)} samples")
-    print(f"Validation data: {len(val_ts)} samples")
-    print(f"Test data: {len(test_ts)} samples")
+    # Load training data with sliding window
+    print("Loading training data with sliding window...")
+    train_ts, train_texts, train_targets = load_data_from_csv_sliding(
+        'data/train_data_new.csv', args.preprocessing, window_size, 
+        use_features=args.features)
+    
+    # Load validation data with fixed window (target: 2023)
+    print("Loading validation data with fixed window...")
+    val_input_years = list(range(2023-window_size, 2023))  # e.g., if window_size=10: 2013-2022
+    val_target_year = '2023'
+    val_ts, val_texts, val_targets = load_data_from_csv_no_sliding(
+        'data/val_data_new.csv', args.preprocessing, val_input_years, val_target_year,
+        use_features=args.features)
+    
+    # Load test data with fixed window (target: 2024)
+    print("Loading test data with fixed window...")
+    test_input_years = list(range(2024-window_size, 2024))  # e.g., if window_size=10: 2014-2023
+    test_target_year = '2024'
+    test_ts, test_texts, test_targets = load_data_from_csv_no_sliding(
+        'data/test_data_new.csv', args.preprocessing, test_input_years, test_target_year,
+        use_features=args.features)
+
+    print(f"Train data: {len(train_ts)} samples, using sliding window of size {window_size}")
+    print(f"Validation data: {len(val_ts)} samples, input years: {val_input_years}, target year: {val_target_year}")
+    print(f"Test data: {len(test_ts)} samples, input years: {test_input_years}, target year: {test_target_year}")
+    if args.features:
+        print(f"Using additional features: {args.features}")
 
     # Create data loaders
     train_loader, val_loader, test_loader = create_data_loaders(
@@ -325,7 +261,7 @@ def run_pipeline(args, config_file, timestamp, disable_progress_bar=False):
 
     # Initialize model
     model = TimeSeriesWithTextModel(
-        ts_input_dim=1,  # Each time step has 1 feature (the normalized value)
+        ts_input_dim=1 + len(args.features),  # Each time step has 1 feature + additional features
         lstm_hidden_dim=args.lstm_hidden_dim,
         text_dim=text_dim,
         fc_hidden_dim=args.fc_hidden_dim,
@@ -348,7 +284,7 @@ def run_pipeline(args, config_file, timestamp, disable_progress_bar=False):
     model.load_state_dict(torch.load(model_path))
 
     # Evaluate model
-    avg_test_loss, mse, rmse, mae, r2, predictions, actuals, original_predictions, original_actuals = evaluate_model(
+    avg_test_loss, mse, rmse, mae, r2, predictions, actuals, original_predictions, original_actuals, original_mse, original_rmse, original_mae, original_r2 = evaluate_model(
         model, test_loader, criterion, DEVICE
     )
 
@@ -358,11 +294,16 @@ def run_pipeline(args, config_file, timestamp, disable_progress_bar=False):
         'preprocessing': args.preprocessing,
         'embedding_model': args.embedding_model,
         'text_model_name': text_model_name,
-        'training_time': float(training_time),  # Convert to Python float
+        'window_size': window_size,
+        'val_input_years': val_input_years,
+        'val_target_year': val_target_year,
+        'test_input_years': test_input_years,
+        'test_target_year': test_target_year,
+        'training_time': float(training_time),
         'train_losses': train_losses,
         'val_losses': val_losses,
-        'best_val_loss': float(best_val_loss),  # Convert to Python float
-        'test_loss': float(avg_test_loss),  # Convert to Python float
+        'best_val_loss': float(best_val_loss),
+        'test_loss': float(avg_test_loss),
         'mse': mse,
         'rmse': rmse,
         'mae': mae,
@@ -394,7 +335,7 @@ if __name__ == "__main__":
         'preprocessing': args.preprocessing,
         'embedding_model': args.embedding_model,
         'text_model_name': get_text_model_name(args.embedding_model),
-        'seq_len': SEQ_LEN,
+        'window_size': args.window_size,
         'text_dim': get_text_dim(args.embedding_model),
         'lstm_hidden_dim': args.lstm_hidden_dim,
         'fc_hidden_dim': args.fc_hidden_dim,
@@ -404,7 +345,24 @@ if __name__ == "__main__":
         'learning_rate': args.learning_rate,
         'weight_decay': args.weight_decay,
         'early_stopping_patience': args.early_stopping_patience,
-        'device': str(DEVICE)
+        'device': str(DEVICE),
+        'features': {
+            'used_features': args.features,
+            'configurations': {
+                'year_index': {
+                    'scale_method': 'minmax',
+                    'scale_global': True
+                },
+                'pct_change': {
+                    'scale_method': 'standardize',
+                    'scale_global': False
+                },
+                'slope': {
+                    'scale_method': 'standardize',
+                    'scale_global': True
+                }
+            }
+        }
     }
     
     config_file = f'{args.output_dir}/config_{timestamp}.json'
@@ -414,6 +372,7 @@ if __name__ == "__main__":
     print(f"Using device: {DEVICE}")
     print(f"Using preprocessing: {args.preprocessing}")
     print(f"Using embedding model: {get_text_model_name(args.embedding_model)}")
+    print(f"Using window size: {args.window_size}")
     print(f"Configuration saved to {config_file}")
     
     # Run the pipeline

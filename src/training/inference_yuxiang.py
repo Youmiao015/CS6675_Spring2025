@@ -84,13 +84,18 @@ def evaluate_with_csv(predictor, csv_path: str):
     
     output_df.to_csv(csv_path.replace(".csv", "_predictions.csv"), index=False)
     print(f"RMSE for {csv_path}: {np.sqrt(np.mean(rmse))}")
-
-
-
-if __name__ == "__main__":
-    predictor = Predictor(MODEL_PATH)
-    print('model loaded')
-
-    evaluate_with_csv(predictor, "val_input.csv")
-    evaluate_with_csv(predictor, "test_input.csv")
     
+predictor = Predictor(MODEL_PATH)
+
+def predict_transformer(inp_array: np.array, topic: str) -> float:
+    """
+    Predicts the count using the transformer model.
+    
+    Args:
+        inp_array: Input array of shape [sequence_length]
+        topic: Topic string
+        
+    Returns:
+        Predicted count as a float
+    """
+    return predictor.predict(inp_array, [topic])[0]

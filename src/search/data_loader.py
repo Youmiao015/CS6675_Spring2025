@@ -30,8 +30,12 @@ class DataLoader:
         conn = self.connect_db()
         cur = conn.cursor()
         cur.execute(
-            "SELECT title, abstract FROM papers WHERE vector_idx = ?",
+            "SELECT metadata FROM papers WHERE vector_idx = ?",
             (int(idx),)  # cast FAISS idx to Python int
         )
+        
         row = cur.fetchone()
-        return {} if row is None else {"title": row[0], "abstract": row[1]}
+        if row is None:
+            return {}
+        record = json.loads(row[0])
+        return record

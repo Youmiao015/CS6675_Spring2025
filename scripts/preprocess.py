@@ -6,67 +6,67 @@ from sentence_transformers import SentenceTransformer
 import faiss
 import pickle
 
-# Updated DATA_FILE to the JSON file with arXiv metadata
-DATA_FILE = 'arxiv_dataset/arxiv-metadata-oai-snapshot.json'
-OUTPUT_INDEX = 'faiss_index.bin'
+# Use the dataset filtered to include only CS papers
+DATA_FILE = 'cs_papers.json' ## '../arxiv_dataset/cs_papers.json'
+OUTPUT_INDEX = 'faiss_index_cosine.bin'
 OUTPUT_META = 'papers_meta.pkl'
 
-# Check if the data file exists
 if not os.path.exists(DATA_FILE):
-    raise FileNotFoundError(f"Data file {DATA_FILE} not found. Please ensure the dataset is downloaded and placed correctly.")
+    raise FileNotFoundError(f"Data file {DATA_FILE} not found. Please run filter_cs.py to generate the CS filtered dataset.")
 
 print("Loading the SentenceTransformer model on GPU...")
-# Load the pre-trained embedding model on GPU
-model = SentenceTransformer('all-MiniLM-L6-v2', device='cuda')
-embedding_dim = model.get_sentence_embedding_dimension()  # Get the dimension of embeddings
+# Use a model specifically designed for scientific papers
+model = SentenceTransformer('allenai-specter', device='cuda')
+embedding_dim = model.get_sentence_embedding_dimension()
 
-# Create a CPU index first, then transfer it to GPU for accelerated search
-cpu_index = faiss.IndexFlatL2(embedding_dim)
+# Use inner product (IndexFlatIP) for cosine similarity, so we need to normalize the vectors
+cpu_index = faiss.IndexFlatIP(embedding_dim)
 gpu_res = faiss.StandardGpuResources()
 gpu_index = faiss.index_cpu_to_gpu(gpu_res, 0, cpu_index)
 
-# List to store paper metadata (you can store only required fields to reduce memory usage)
+# Store paper metadata
 papers_meta = []
 
-# Set batch size to process a few records at a time
 batch_size = 10000
 batch_texts = []
 processed_count = 0
 
 print("Processing data in batches...")
-# Open the JSON file and process line by line (assumes JSON Lines format)
 with open(DATA_FILE, 'r', encoding='utf-8') as f:
     for line in f:
         paper = json.loads(line)
-        # Append the paper metadata (or store only selected fields)
         papers_meta.append(paper)
-        # Get the abstract text for vectorization; if missing, use an empty string
-        batch_texts.append(paper.get('abstract', ''))
+        # Concatenate title and abstract as input text
+        text = paper.get('title', '') + " " + paper.get('abstract', '')
+        batch_texts.append(text)
         processed_count += 1
         
-        # When batch size is reached, encode the texts and add to the Faiss index
         if processed_count % batch_size == 0:
             print(f"Processing batch {processed_count // batch_size}")
             embeddings = model.encode(batch_texts, show_progress_bar=True)
             embeddings = np.array(embeddings).astype('float32')
+            # Normalize the embedding vectors
+            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+            embeddings = embeddings / norms
             gpu_index.add(embeddings)
-            batch_texts = []  # Reset the batch
+            batch_texts = []
 
-# Process any remaining texts in the last batch
 if batch_texts:
     print("Processing final batch...")
     embeddings = model.encode(batch_texts, show_progress_bar=True)
     embeddings = np.array(embeddings).astype('float32')
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    embeddings = embeddings / norms
     gpu_index.add(embeddings)
 
 print("Finished processing all papers.")
 
-# Transfer the GPU index back to CPU before saving
+# Transfer the index from GPU back to CPU for saving
 cpu_index_final = faiss.index_gpu_to_cpu(gpu_index)
 faiss.write_index(cpu_index_final, OUTPUT_INDEX)
 print(f"Faiss index saved to {OUTPUT_INDEX}")
 
-# Save the metadata (papers_meta) to a pickle file for later retrieval
+# Save the paper metadata
 with open(OUTPUT_META, 'wb') as f:
     pickle.dump(papers_meta, f)
 print(f"Paper metadata saved to {OUTPUT_META}")

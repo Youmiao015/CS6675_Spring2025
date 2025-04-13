@@ -24,14 +24,18 @@ class DataLoader:
             self.conn = sqlite3.connect(self.db_path)
         return self.conn
 
-    # return metadata of similar papers based on model inputs 
+    # Return metadata of similar papers based on model inputs.
+    # Now only returns title and abstract because the DB only stores these fields.
     def get_metadata(self, idx: int) -> dict:
         conn = self.connect_db()
         cur = conn.cursor()
         cur.execute(
-            "SELECT id, title, abstract, update_date FROM papers WHERE vector_idx = ?",
-            (int(idx),)     # cast FAISS idx to Python int
+            "SELECT metadata FROM papers WHERE vector_idx = ?",
+            (int(idx),)  # cast FAISS idx to Python int
         )
+        
         row = cur.fetchone()
-        return {} if row is None else {"id": row[0], "title": row[1], "abstract": row[2], "update_date": row[3]}
-
+        if row is None:
+            return {}
+        record = json.loads(row[0])
+        return record

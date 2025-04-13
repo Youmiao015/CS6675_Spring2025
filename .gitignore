@@ -1,6 +1,7 @@
 data/
 topics/
 arxiv_dataset/
+6675/
 full_dataset.csv
 *.pyc
 .DS_Store

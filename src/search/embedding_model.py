@@ -4,7 +4,7 @@ import torch
 from sentence_transformers import SentenceTransformer
 
 class EmbeddingModel:
-    def __init__(self, model_name='all-MiniLM-L6-v2', device=None):
+    def __init__(self, model_name='allenai-specter', device=None):
         """
         Load a SentenceTransformer model on GPU if available (or CPU otherwise).
         """

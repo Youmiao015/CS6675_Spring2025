@@ -150,6 +150,13 @@ curl -s -X POST http://localhost:8000/search/aggregate_by_year \
 Sample Output:
 ![Search Aggregation Plot](/docs/images/prediction_demo.png)
 
+## Frontend
+```bash
+cd frontend
+python -m http.server 8001
+```
+http://localhost:8001/index.html
+
 
 # Generate research areas with LLM
 This step was performed on PACE ICE. To perform this step, first install required conda environment using `/other_requirements/generate_areas_llm_environment.yml`. Then, you can run the following two commands:

@@ -21,13 +21,14 @@ class DataLoader:
         if self.conn is None:
             if not os.path.exists(self.db_path):
                 raise FileNotFoundError(f"DB file not found: {self.db_path}")
-            self.conn = sqlite3.connect(self.db_path)
+            self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         return self.conn
 
     # Return metadata of similar papers based on model inputs.
     # Now only returns title and abstract because the DB only stores these fields.
     def get_metadata(self, idx: int) -> dict:
-        conn = self.connect_db()
+        # conn = self.connect_db()
+        conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()
         cur.execute(
             "SELECT metadata FROM papers WHERE vector_idx = ?",

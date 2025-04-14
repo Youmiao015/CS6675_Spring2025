@@ -2,18 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Paper Search and Model Prediction</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
   <header>
-    <!-- Simple navigation bar (optional) -->
+    <!-- Top navigation bar -->
     <nav class="navbar">
       <div class="navbar-logo">Paper Trend Predictor</div>
     </nav>
-    
-    <!-- Main heading and subtitle -->
+
+    <!-- Page title and subtitle -->
     <h1>Paper Search and Model Prediction</h1>
     <p class="subtitle">
       Quickly discover relevant papers and get an estimated trend prediction.
@@ -21,7 +22,7 @@
   </header>
 
   <main>
-    <!-- Search section -->
+    <!-- 1. Search bar -->
     <section id="search-section">
       <h2>Search</h2>
       <div class="search-container">
@@ -30,26 +31,28 @@
       </div>
     </section>
 
-    <!-- Results section -->
-    <section id="results-section">
-      <h2>Search Results</h2>
-      <div id="search-results"></div>
-    </section>
+    <!-- 2. Two independent result panels -->
+    <div id="results-wrapper">
+      <!-- 2‑A Search Results -->
+      <section id="search-panel" class="results-panel">
+        <h2>Search Results</h2>
+        <!-- JS injects: aggregate plot → toggle button → text box -->
+      </section>
 
-    <!-- Prediction results section -->
-    <section id="prediction-section">
-      <h2>Model Prediction Results</h2>
-      <div id="prediction-result"></div>
-    </section>
+      <!-- 2‑B Model Prediction -->
+      <section id="prediction-panel" class="results-panel">
+        <h2>Model Prediction</h2>
+        <!-- JS injects: prediction demo image -->
+      </section>
+    </div>
   </main>
 
-  <!-- Simple footer -->
   <footer>
-    <p>© 2025 PaperTrend. All rights reserved.</p>
+    <p>© 2025 PaperTrend. All rights reserved.</p>
   </footer>
 
-  <!-- Load scripts -->
-  <script src="api.js"></script>
-  <script src="main.js"></script>
+  <!-- Load scripts as ES‑Modules (ONLY ONCE) -->
+  <script type="module" src="api.js"></script>
+  <script type="module" src="main.js"></script>
 </body>
 </html>

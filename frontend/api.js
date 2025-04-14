@@ -1,57 +1,65 @@
-/*
+/* ------------------------------------------------------------------
  * api.js
- * Encapsulates API calls to the backend.
- */
+ * 负责调用 FastAPI 后端，返回 Promise 结果。
+ * 不包含任何 DOM 操作；界面更新逻辑写在 main.js 中。
+ * ------------------------------------------------------------------ */
 
 /**
- * Fetch search results for a given topic from the backend.
- * @param {string} topic - The search topic.
- * @returns {Promise<Array>} - A promise that resolves to an array of paper objects.
+ * POST /search
+ * @param {string} topic - 查询主题
+ * @param {number} topK  - 返回前 K 条
+ * @returns {Promise<Array>} papers array
  */
-function fetchSearchResults(topic) {
+export function fetchSearchResults(topic, topK = 5) {
   return fetch('http://localhost:8000/search', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      query: topic,
-      top_k: 5  // Request 5 results
-    })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: topic, top_k: topK })
   })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      return response.json();
-    })
-    .then(data => {
-      // Assume the returned data structure is { results: [ ... ], aggregated_metrics: { ... } }
-      return data.results || [];
-    })
-    .catch(error => {
-      console.error('Error fetching search results:', error);
+    .then(res => res.json())
+    .then(data => data.results || [])
+    .catch(err => {
+      console.error('Error fetching search results:', err);
       return [];
     });
 }
 
 /**
- * Simulate fetching a model prediction for a given topic.
- * @param {string} topic - The search topic.
- * @returns {Promise<Object>} - A promise that resolves to a prediction object.
+ * POST /search/aggregate_plot
+ * 返回一张聚合柱状图 (PNG) 的 blob URL
+ * @param {string} topic
+ * @returns {Promise<string|null>} object‑URL or null
  */
-function fetchModelPrediction(topic) {
-  const mockPrediction = {
-    topic: topic,
-    prediction: Math.floor(Math.random() * 100)
-  };
-
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(mockPrediction);
-    }, 800);
-  });
+export function fetchAggregatePlot(topic) {
+  return fetch('http://localhost:8000/search/aggregate_plot', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: topic, top_k: 10000 })
+  })
+    .then(res => res.blob())
+    .then(blob => URL.createObjectURL(blob))
+    .catch(err => {
+      console.error('Error fetching aggregate plot:', err);
+      return null;
+    });
 }
 
-// Optional: export functions if using modules
-// export { fetchSearchResults, fetchModelPrediction };
+/**
+ * POST /search/prediction_demo
+ * 返回预测柱状图 (PNG) 的 blob URL
+ * @param {string} topic
+ * @returns {Promise<string|null>} object‑URL or null
+ */
+export function fetchPredictionDemoImage(topic) {
+  return fetch('http://localhost:8000/search/prediction_demo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: topic, top_k: 10000 })
+  })
+    .then(res => res.blob())
+    .then(blob => URL.createObjectURL(blob))
+    .catch(err => {
+      console.error('Error fetching prediction demo image:', err);
+      return null;
+    });
+}

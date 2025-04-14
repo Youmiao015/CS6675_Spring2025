@@ -1,150 +1,131 @@
-/* Reset default browser styling */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* ──────────────────── 0. Reset & base ──────────────────── */
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+  font-family:Arial,Helvetica,sans-serif;
+  line-height:1.6;
+  background:#f4f4f4;
+  color:#333;
+  padding:20px;
 }
 
-/* Body styling */
-body {
-  font-family: Arial, sans-serif;
-  line-height: 1.6;
-  background-color: #f4f4f4;
-  color: #333;
-  padding: 20px;
+/* ──────────────────── 1. Header / navbar ───────────────── */
+.navbar{background:#007BFF;padding:10px;margin-bottom:10px;}
+.navbar-logo{color:#fff;font-size:18px;font-weight:bold;}
+
+header h1{text-align:center;margin-bottom:10px;}
+.subtitle{text-align:center;font-size:1.1em;color:#666;margin-bottom:20px;}
+
+/* ──────────────────── 2. Main card ─────────────────────── */
+main{
+  max-width:1000px;
+  margin:0 auto;
+  background:#fff;
+  padding:20px;
+  border-radius:5px;
+  box-shadow:0 0 10px rgba(0,0,0,.1);
 }
 
-/* Navigation bar */
-.navbar {
-  background-color: #007BFF;
-  padding: 10px;
-  margin-bottom: 10px;
+/* ──────────────────── 3. Search bar ────────────────────── */
+.search-container{display:flex;justify-content:center;align-items:center;}
+#search-input{
+  flex:1;
+  padding:10px;
+  font-size:16px;
+  border:1px solid #ccc;
+  border-radius:4px;
+  margin-right:10px;
+}
+#search-button{
+  padding:10px 20px;
+  font-size:16px;
+  border:none;
+  background:#007BFF;
+  color:#fff;
+  border-radius:4px;
+  cursor:pointer;
+  transition:background .3s;
+}
+#search-button:hover{background:#0056b3;}
+
+/* ──────────────────── 4. Results wrapper ───────────────── */
+#results-wrapper{
+  display:flex;
+  gap:20px;
+  flex-wrap:wrap;          /* allow wrap on small width */
+  margin-top:20px;
 }
 
-.navbar-logo {
-  color: #fff;
-  font-size: 18px;
-  font-weight: bold;
+/* Generic panel style (search & prediction) */
+.results-panel{
+  flex:1 1 48%;            /* two‑column layout on wide screens */
+  background:#f8f9fa;
+  padding:15px;
+  border:1px solid #ddd;
+  border-radius:4px;
+  box-shadow:0 2px 6px rgba(0,0,0,.1);
 }
 
-/* Main heading styling */
-header h1 {
-  text-align: center;
-  margin-bottom: 10px;
+/* Stack panels vertically on small screens */
+@media(max-width:768px){
+  #results-wrapper{flex-direction:column;}
+  .results-panel{flex:1 1 100%;}
 }
 
-/* Subtitle under the main heading */
-.subtitle {
-  text-align: center;
-  font-size: 1.1em;
-  color: #666;
-  margin-bottom: 20px;
+/* ───────────── 4‑A. Search Results text list ───────────── */
+.text-result-item{margin-bottom:15px;}
+.text-result-item h3{margin-bottom:6px;}
+
+/* Clamp abstract to 2 lines */
+.abstract{
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
 }
 
-/* Main container styling */
-main {
-  max-width: 800px;
-  margin: 0 auto;
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 5px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+/* ───────────── 4‑B. Buttons inside list ────────────────── */
+.text-result-item button,
+.result-item button,
+#search-panel button,
+#prediction-panel button{
+  margin-top:8px;
+  background:#007BFF;
+  color:#fff;
+  border:none;
+  padding:6px 12px;
+  cursor:pointer;
+  border-radius:4px;
+  transition:background .3s;
+}
+.text-result-item button:hover,
+.result-item button:hover,
+#search-panel button:hover,
+#prediction-panel button:hover{
+  background:#0056b3;
 }
 
-/* Section styling */
-section {
-  margin-bottom: 20px;
+/* ───────────── 5. Images (aggregate & prediction) ──────── */
+.responsive-img{
+  max-width:100%;
+  height:auto;
+  display:block;
+  margin:0 auto 10px;      /* centered with bottom gap */
 }
 
-/* Search container styling */
-.search-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+/* Click‑to‑zoom */
+.responsive-img.enlarged{
+  transform:scale(1.8);
+  cursor:zoom-out;
+  transition:transform .3s;
+  z-index:1000;
+  position:relative;
 }
 
-#search-input {
-  flex: 1;
-  padding: 10px;
-  font-size: 16px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  margin-right: 10px;
+/* ───────────── 6. Prediction panel special BG ──────────── */
+#prediction-panel{
+  background:rgba(0,123,255,.05);     /* subtle blue tint */
 }
 
-#search-button {
-  padding: 10px 20px;
-  font-size: 16px;
-  border: none;
-  background-color: #007BFF;
-  color: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-#search-button:hover {
-  background-color: #0056b3;
-}
-
-/* Search results container */
-#search-results {
-  margin-top: 10px;
-}
-
-/* Individual result styling */
-.result-item {
-  background-color: #f8f9fa;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 15px;
-  margin-bottom: 10px;
-  transition: box-shadow 0.3s ease;
-}
-
-.result-item:hover {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-}
-
-.result-item h3 {
-  margin-bottom: 8px;
-}
-
-/* Buttons inside result items (Show More / Show Less) */
-.result-item button {
-  margin-top: 8px;
-  background-color: #007BFF;
-  color: #fff;
-  border: none;
-  padding: 6px 12px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.3s ease;
-}
-
-.result-item button:hover {
-  background-color: #0056b3;
-}
-
-/* Prediction result section styling */
-#prediction-result {
-  margin-top: 10px;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-/* Abstract collapsed: single-line ellipsis */
-.abstract.collapsed {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Footer styling */
-footer {
-  text-align: center;
-  margin-top: 20px;
-  color: #777;
-  font-size: 0.9em;
-}
+/* ──────────────────── 7. Footer ───────────────────────── */
+footer{text-align:center;margin-top:20px;color:#777;font-size:.9em;}

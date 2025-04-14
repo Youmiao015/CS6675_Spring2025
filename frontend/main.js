@@ -1,116 +1,116 @@
-/*
- * main.js
- * Main file for page interaction.
- * Listens for user input, calls the API functions, and updates the DOM.
- */
+/* main.js  ─ UI logic (ES‑Module) */
+import {
+  fetchSearchResults,
+  fetchAggregatePlot,
+  fetchPredictionDemoImage
+} from './api.js';
 
-document.addEventListener('DOMContentLoaded', function() {
-  // Get DOM elements
-  const searchInput = document.getElementById('search-input');
+document.addEventListener('DOMContentLoaded', () => {
+  /* Grab DOM elements */
+  const searchInput  = document.getElementById('search-input');
   const searchButton = document.getElementById('search-button');
-  const searchResultsContainer = document.getElementById('search-results');
-  const predictionResultContainer = document.getElementById('prediction-result');
+  const searchPanel  = document.getElementById('search-panel');
+  const predictionPanel = document.getElementById('prediction-panel');
 
-  // Event listener for the search button
-  searchButton.addEventListener('click', function() {
+  if (!searchInput || !searchButton || !searchPanel || !predictionPanel) {
+    console.error('Required elements are missing.');
+    return;
+  }
+
+  /* Search click */
+  searchButton.addEventListener('click', () => {
     const topic = searchInput.value.trim();
-    if (!topic) {
-      alert('Please enter a topic.');
-      return;
-    }
+    if (!topic) { alert('Please enter a topic.'); return; }
 
-    // Clear previous results
-    searchResultsContainer.innerHTML = '';
-    predictionResultContainer.innerHTML = '';
+    searchPanel.innerHTML     = '<p>Loading search results…</p>';
+    predictionPanel.innerHTML = '<p>Loading prediction…</p>';
 
-    // Show loading hints
-    searchResultsContainer.innerHTML = '<p>Loading search results...</p>';
-    predictionResultContainer.innerHTML = '<p>Loading prediction...</p>';
-
-    // Call API interfaces in parallel
-    Promise.all([fetchSearchResults(topic), fetchModelPrediction(topic)])
-      .then(([searchResults, modelPrediction]) => {
-        searchResultsContainer.innerHTML = '';
-
-        if (searchResults.length > 0) {
-          // Sort by distance ascending (lower means more similar)
-          searchResults.sort((a, b) => b.distance - a.distance);
-
-          searchResults.forEach((result, index) => {
-            const resultDiv = createResultItem(result, index);
-            searchResultsContainer.appendChild(resultDiv);
-          });
-        } else {
-          searchResultsContainer.innerHTML = '<p>No results found.</p>';
-        }
-
-        // Update the prediction result display area
-        predictionResultContainer.innerHTML = `<p>Prediction for "${modelPrediction.topic}": ${modelPrediction.prediction}</p>`;
+    Promise.all([
+      fetchSearchResults(topic),
+      fetchAggregatePlot(topic),
+      fetchPredictionDemoImage(topic)
+    ])
+      .then(([papers, aggUrl, predUrl]) => {
+        renderSearchPanel(papers, aggUrl);
+        renderPredictionPanel(predUrl);
       })
-      .catch(error => {
-        console.error('Error fetching data:', error);
-        searchResultsContainer.innerHTML = '<p>Error loading search results.</p>';
-        predictionResultContainer.innerHTML = '<p>Error loading prediction.</p>';
+      .catch(err => {
+        console.error(err);
+        searchPanel.innerHTML     = '<p>Error loading search results.</p>';
+        predictionPanel.innerHTML = '<p>Error loading prediction.</p>';
       });
   });
 
-  /**
-   * Create a DOM element for a search result.
-   * Display format:
-   *   Paper {index}: {title}
-   *   Similarity: {distance}
-   *   Abstract: (initially collapsed, expandable with a toggle button)
-   * @param {Object} result - Article object returned by the API, containing title, abstract, distance, etc.
-   * @param {number} index - Result index.
-   * @returns {HTMLElement} - The created DOM element.
-   */
-  function createResultItem(result, index) {
-    const container = document.createElement('div');
-    container.classList.add('result-item');
+  /* ---------- helpers ---------- */
+  function renderSearchPanel(results, aggUrl) {
+    searchPanel.innerHTML = '';
 
-    // Title
-    const titleElem = document.createElement('h3');
-    titleElem.textContent = `Paper ${index + 1}: ${result.title}`;
-    container.appendChild(titleElem);
+    /* aggregate plot */
+    if (aggUrl) {
+      const img = document.createElement('img');
+      img.src = aggUrl;
+      img.alt = 'Aggregate Plot';
+      img.classList.add('responsive-img');
+      img.addEventListener('click', () => img.classList.toggle('enlarged'));
+      searchPanel.appendChild(img);
+    }
 
-    // Similarity (distance)
-    const similarityElem = document.createElement('p');
-    similarityElem.textContent = `Similarity: ${result.distance}`;
-    container.appendChild(similarityElem);
+    /* toggle button + hidden text box */
+    const btn  = document.createElement('button');
+    btn.textContent = 'Show Text Details';
+    const box = document.createElement('div');
+    box.style.display = 'none';
+    searchPanel.appendChild(btn);
+    searchPanel.appendChild(box);
 
-    // Abstract
-    const abstractElem = document.createElement('p');
-    // Add collapsed class to initially show only one line (controlled by CSS)
-    abstractElem.classList.add('abstract', 'collapsed');
-    // Prevent undefined
-    abstractElem.textContent = result.abstract || '';
-    container.appendChild(abstractElem);
-
-    // Toggle button for expanding/collapsing
-    const toggleBtn = document.createElement('button');
-    toggleBtn.textContent = 'Show More';
-    toggleBtn.addEventListener('click', function() {
-      if (abstractElem.classList.contains('collapsed')) {
-        abstractElem.classList.remove('collapsed');
-        toggleBtn.textContent = 'Show Less';
-      } else {
-        abstractElem.classList.add('collapsed');
-        toggleBtn.textContent = 'Show More';
-      }
+    btn.addEventListener('click', () => {
+      const hide = box.style.display === 'none';
+      box.style.display = hide ? 'block' : 'none';
+      btn.textContent  = hide ? 'Hide Text Details' : 'Show Text Details';
     });
-    container.appendChild(toggleBtn);
 
-    return container;
+    /* populate text box */
+    if (results.length) {
+      results
+        .sort((a, b) =>
+          (b.similarity ?? b.distance ?? 0) - (a.similarity ?? a.distance ?? 0))
+        .forEach((r, i) => box.appendChild(textItem(r, i)));
+    } else {
+      box.innerHTML = '<p>No results found.</p>';
+    }
+  }
+
+  function renderPredictionPanel(predUrl) {
+    predictionPanel.innerHTML = '';
+    if (predUrl) {
+      const img = document.createElement('img');
+      img.src = predUrl;
+      img.alt = 'Prediction Results';
+      img.classList.add('responsive-img');
+      img.addEventListener('click', () => img.classList.toggle('enlarged'));
+      predictionPanel.appendChild(img);
+    } else {
+      predictionPanel.innerHTML = '<p>Error loading prediction image.</p>';
+    }
+  }
+
+  function textItem(result, idx) {
+    const div = document.createElement('div');
+    div.classList.add('text-result-item');
+
+    const title = document.createElement('h3');
+    title.textContent = `Paper ${idx + 1}: ${result.title}`;
+    div.appendChild(title);
+
+    const abstract = document.createElement('p');
+    abstract.textContent = result.abstract || '';
+    abstract.classList.add('abstract');
+    div.appendChild(abstract);
+
+    const sim = document.createElement('p');
+    sim.textContent = `Similarity: ${result.similarity ?? result.distance ?? 'N/A'}`;
+    div.appendChild(sim);
+
+    return div;
   }
 });
-
-/**
- * Demo function for testing.
- * Auto-fills the search input with a demo topic and triggers a search.
- */
-function demoSearch() {
-  document.getElementById('search-input').value = 'Demo Topic';
-  document.getElementById('search-button').click();
-}
-
-window.demoSearch = demoSearch;

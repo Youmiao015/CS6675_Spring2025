@@ -92,119 +92,71 @@ def aggregate_search(request: SearchRequest):
 
 @app.post("/search/aggregate_plot")
 def aggregate_plot(request: SearchRequest):
-    # Validate input query
+    # Input validation
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
-    
-    # Reuse the aggregation logic from the previous endpoint
+
+    # Count papers from 2007–2024
     search_results = search_engine.search(request.query, top_k=10000)
-    year_dict = {str(year): 0 for year in range(2007, 2025)}
-    for record in search_results.get("results", []):
-        update_date = record.get("update_date", "")
-        # print("Debug - Record update_date:", update_date)
+    year_dict = {str(y): 0 for y in range(2007, 2025)}
+    for rec in search_results.get("results", []):
+        update_date = rec.get("update_date", "")
         if len(update_date) >= 4:
             try:
-                year = int(update_date[:4])
-                if 2007 <= year <= 2024:
-                    year_dict[str(year)] += 1
+                y = int(update_date[:4])
+                if 2007 <= y <= 2024:
+                    year_dict[str(y)] += 1
             except ValueError:
                 continue
 
-    # Create a list of counts for years 2007 to 2024
-    counts_list = [year_dict[str(year)] for year in range(2007, 2025)]
-    years = list(range(2007, 2025))
-    counts = np.array(counts_list, dtype=np.int32)
-    max_count = counts.max() if counts.max() > 0 else 1
+    real_counts = np.array([year_dict[str(y)] for y in range(2007, 2025)],
+                           dtype=np.int32)
 
-    # Create a blue gradient: higher counts yield a darker blue.
-    colors = [cm.Blues(count / max_count) for count in counts]
-    
-    # Create a bar chart
+    # ---------- Predict the value for 2025 ----------
+    last3 = real_counts[-3:]  # Years: 2022, 2023, 2024
+    if last3.sum() == 0:
+        predicted_2025 = 1  # Minimum fallback value to avoid empty chart
+    else:
+        # Generate 3 random positive numbers and normalize as weights
+        w = np.random.rand(3)
+        w = w / w.sum()
+        predicted_2025 = int(np.round(np.dot(last3, w)))
+        predicted_2025 = max(predicted_2025, 1)  # Ensure at least 1
+
+    # ---------- Visualization ----------
+    years = list(range(2007, 2026))
+    combined_counts = real_counts.tolist() + [predicted_2025]
+
+    max_cnt = max(combined_counts)
+    max_cnt = max_cnt if max_cnt > 0 else 1
+
+    # Real values: green gradient; Predicted bar: same color, semi-transparent
+    colors_real = [cm.Greens(c / max_cnt) for c in real_counts]
+    base = cm.Greens(predicted_2025 / max_cnt)
+    color_pred = (base[0], base[1], base[2], 0.5)
+    bar_colors = colors_real + [color_pred]
+
     plt.figure(figsize=(10, 6))
-    plt.bar(years, counts, color=colors)
+    plt.bar(years, combined_counts, color=bar_colors)
     plt.xlabel("Year")
     plt.ylabel("Number of Papers")
-    plt.title("Number of Similar Papers by Year (2007-2024)")
-    plt.xticks(years)
-    
-    # Save the plot to a BytesIO buffer
+    plt.title("Number of Similar Papers by Year (2007–2025)")
+    plt.xticks(years, rotation=45)
+
+    # Add question mark annotation on the 2025 bar
+    plt.text(2025, predicted_2025, "?", ha="center", va="bottom",
+             fontsize=14, color="red", fontweight="bold")
+
     buf = BytesIO()
+    plt.tight_layout()
     plt.savefig(buf, format="png")
     plt.close()
     buf.seek(0)
-    
-    # Return the image as PNG content
+
     return Response(content=buf.getvalue(), media_type="image/png")
 
-# @app.post("/search/prediction_demo")
-# def prediction_demo(request: SearchRequest):
-#     # Validate input query
-#     if not request.query.strip():
-#         raise HTTPException(status_code=400, detail="Query cannot be empty")
-    
-#     # Perform search to retrieve candidate records (top_k set high to capture many candidates)
-#     search_results = search_engine.search(request.query, top_k=10000)
-    
-#     # Initialize dictionary for years 2007 to 2024 with count 0
-#     year_dict = {str(year): 0 for year in range(2007, 2025)}
-    
-#     # Aggregate counts from the search results using the update_date field
-#     for record in search_results.get("results", []):
-#         update_date = record.get("update_date", "")
-#         # Print debug info if needed
-#         # print("Debug - Record update_date:", update_date)
-#         if len(update_date) >= 4:
-#             try:
-#                 year = int(update_date[:4])
-#                 if 2007 <= year <= 2024:
-#                     year_dict[str(year)] += 1
-#             except ValueError:
-#                 continue
 
-#     # Create a list of counts for years 2007 to 2024
-#     counts_list = [year_dict[str(year)] for year in range(2007, 2025)]
-    
-#     # We'll extend the x-axis for years 2007 to 2025:
-#     years = list(range(2007, 2026))
-    
-#     # For the prediction demo, assign a placeholder height for year 2025.
-#     # Here we use half of the maximum real count (or 1 if all are zero) as the demo value.
-#     real_counts = np.array(counts_list, dtype=np.int32)
-#     max_count = real_counts.max() if real_counts.max() > 0 else 1
-#     predicted_value = max_count * 0.5  # Demo predicted height for 2025
-    
-#     # Combine the real counts with the demo predicted value for 2025
-#     combined_counts = counts_list + [predicted_value]
-    
-#     # Create colors for bars: for years 2007-2024, use colors from a blue gradient;
-#     # for 2025, use the same base color with half transparency.
-#     colors = []
-#     for count in counts_list:
-#         # Normalize count against max_count for colormap scaling
-#         colors.append(cm.Blues(count / max_count))
-#     # For 2025, use the predicted_value with alpha forced to 0.5
-#     base_color = cm.Blues(predicted_value / max_count)
-#     predicted_color = (base_color[0], base_color[1], base_color[2], 0.5)
-#     combined_colors = colors + [predicted_color]
-    
-#     # Create the bar chart
-#     plt.figure(figsize=(10, 6))
-#     plt.bar(years, combined_counts, color=combined_colors)
-#     plt.xlabel("Year")
-#     plt.ylabel("Number of Papers")
-#     plt.title("Topic Prediction: Papers by Year (2007-2025)")
-#     plt.xticks(years)
-    
-#     # Annotate the prediction bar (2025) with a question mark
-#     plt.text(2025, predicted_value, "?", ha='center', va='bottom', fontsize=14, color='red')
-    
-#     # Save the plot to a buffer and return as PNG image
-#     buf = BytesIO()
-#     plt.savefig(buf, format="png")
-#     plt.close()
-#     buf.seek(0)
-    
-#     return Response(content=buf.getvalue(), media_type="image/png")
+
 
 @app.post("/search/prediction_demo")
 def prediction_demo(request: SearchRequest):

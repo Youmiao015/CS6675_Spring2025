@@ -1,18 +1,17 @@
-/* main.js  ─ UI logic (ES‑Module) */
+/* main.js — UI logic (ES‑Module) */
 import {
   fetchSearchResults,
-  fetchAggregatePlot,
-  fetchPredictionDemoImage
+  fetchAggregatePlot
+  // ✅ No longer importing fetchPredictionDemoImage
 } from './api.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   /* Grab DOM elements */
   const searchInput  = document.getElementById('search-input');
   const searchButton = document.getElementById('search-button');
-  const searchPanel  = document.getElementById('search-panel');
-  const predictionPanel = document.getElementById('prediction-panel');
+  const resultPanel  = document.getElementById('result-panel');
 
-  if (!searchInput || !searchButton || !searchPanel || !predictionPanel) {
+  if (!searchInput || !searchButton || !resultPanel) {
     console.error('Required elements are missing.');
     return;
   }
@@ -22,54 +21,51 @@ document.addEventListener('DOMContentLoaded', () => {
     const topic = searchInput.value.trim();
     if (!topic) { alert('Please enter a topic.'); return; }
 
-    searchPanel.innerHTML     = '<p>Loading search results…</p>';
-    predictionPanel.innerHTML = '<p>Loading prediction…</p>';
+    resultPanel.innerHTML = '<p>Loading…</p>';
 
     Promise.all([
       fetchSearchResults(topic),
-      fetchAggregatePlot(topic),
-      fetchPredictionDemoImage(topic)
+      fetchAggregatePlot(topic)
+      // ✅ Removed the third API call
     ])
-      .then(([papers, aggUrl, predUrl]) => {
-        renderSearchPanel(papers, aggUrl);
-        renderPredictionPanel(predUrl);
+      .then(([papers, aggUrl]) => {
+        renderResultPanel(papers, aggUrl);   // Only passing two arguments
       })
       .catch(err => {
         console.error(err);
-        searchPanel.innerHTML     = '<p>Error loading search results.</p>';
-        predictionPanel.innerHTML = '<p>Error loading prediction.</p>';
+        resultPanel.innerHTML = '<p>Error loading information.</p>';
       });
   });
 
   /* ---------- helpers ---------- */
-  function renderSearchPanel(results, aggUrl) {
-    searchPanel.innerHTML = '';
+  function renderResultPanel(results, aggUrl) {  // <- Two parameters
+    resultPanel.innerHTML = '';
 
-    /* aggregate plot */
+    /* 1. aggregate plot */
     if (aggUrl) {
       const img = document.createElement('img');
       img.src = aggUrl;
       img.alt = 'Aggregate Plot';
       img.classList.add('responsive-img');
       img.addEventListener('click', () => img.classList.toggle('enlarged'));
-      searchPanel.appendChild(img);
+      resultPanel.appendChild(img);
     }
 
-    /* toggle button + hidden text box */
+    /* 2. toggle button + hidden text box */
     const btn  = document.createElement('button');
     btn.textContent = 'Show Text Details';
     const box = document.createElement('div');
     box.style.display = 'none';
-    searchPanel.appendChild(btn);
-    searchPanel.appendChild(box);
+    resultPanel.appendChild(btn);
+    resultPanel.appendChild(box);
 
     btn.addEventListener('click', () => {
       const hide = box.style.display === 'none';
-      box.style.display = hide ? 'block' : 'none';
-      btn.textContent  = hide ? 'Hide Text Details' : 'Show Text Details';
+      box.style.display   = hide ? 'block' : 'none';
+      btn.textContent     = hide ? 'Hide Text Details' : 'Show Text Details';
     });
 
-    /* populate text box */
+    /* 3. populate text box */
     if (results.length) {
       results
         .sort((a, b) =>
@@ -77,20 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
         .forEach((r, i) => box.appendChild(textItem(r, i)));
     } else {
       box.innerHTML = '<p>No results found.</p>';
-    }
-  }
-
-  function renderPredictionPanel(predUrl) {
-    predictionPanel.innerHTML = '';
-    if (predUrl) {
-      const img = document.createElement('img');
-      img.src = predUrl;
-      img.alt = 'Prediction Results';
-      img.classList.add('responsive-img');
-      img.addEventListener('click', () => img.classList.toggle('enlarged'));
-      predictionPanel.appendChild(img);
-    } else {
-      predictionPanel.innerHTML = '<p>Error loading prediction image.</p>';
     }
   }
 

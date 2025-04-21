@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paper Search and Model Prediction</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <!-- ────────── Header ────────── -->
+  <header>
+    <nav class="navbar">
+      <div class="navbar-logo">Paper Trend Predictor</div>
+    </nav>
+
+    <h1>Paper Search and Model Prediction</h1>
+    <p class="subtitle">
+      Quickly discover relevant papers and get an estimated trend prediction.
+    </p>
+  </header>
+
+  <!-- ────────── Main ────────── -->
+  <main>
+    <!-- 1. Search bar -->
+    <section id="search-section">
+      <h2>Search</h2>
+      <div class="search-container">
+        <input type="text" id="search-input" placeholder="Enter a topic" />
+        <button id="search-button">Search</button>
+      </div>
+    </section>
+
+    <!-- 2. SINGLE result panel -->
+    <div id="results-wrapper">
+      <section id="result-panel" class="results-panel">
+        <h2>Prediction Results</h2>
+        <!-- JS 注入：aggregate plot → toggle button → text box → prediction image -->
+      </section>
+    </div>
+  </main>
+
+  <!-- ────────── Footer ────────── -->
+  <footer>
+    <p>© 2025 PaperTrend. All rights reserved.</p>
+  </footer>
+
+  <!-- ────────── Scripts (ES‑Modules) ────────── -->
+  <script type="module" src="api.js"></script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

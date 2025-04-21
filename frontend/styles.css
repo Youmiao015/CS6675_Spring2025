@@ -1,0 +1,112 @@
+/* ──────────────────── 0. Reset & base ──────────────────── */
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+  font-family:Arial,Helvetica,sans-serif;
+  line-height:1.6;
+  background:#f4f4f4;
+  color:#333;
+  padding:20px;
+}
+
+/* ──────────────────── 1. Header / navbar ───────────────── */
+.navbar{background:#007BFF;padding:10px;margin-bottom:10px;}
+.navbar-logo{color:#fff;font-size:18px;font-weight:bold;}
+
+header h1{text-align:center;margin-bottom:10px;}
+.subtitle{text-align:center;font-size:1.1em;color:#666;margin-bottom:20px;}
+
+/* ──────────────────── 2. Main card ─────────────────────── */
+main{
+  max-width:1000px;
+  margin:0 auto;
+  background:#fff;
+  padding:20px;
+  border-radius:5px;
+  box-shadow:0 0 10px rgba(0,0,0,.1);
+}
+
+/* ──────────────────── 3. Search bar ────────────────────── */
+.search-container{display:flex;justify-content:center;align-items:center;}
+#search-input{
+  flex:1;
+  padding:10px;
+  font-size:16px;
+  border:1px solid #ccc;
+  border-radius:4px;
+  margin-right:10px;
+}
+#search-button{
+  padding:10px 20px;
+  font-size:16px;
+  border:none;
+  background:#007BFF;
+  color:#fff;
+  border-radius:4px;
+  cursor:pointer;
+  transition:background .3s;
+}
+#search-button:hover{background:#0056b3;}
+
+/* ──────────────────── 4. Results wrapper ───────────────── */
+#results-wrapper{           /* 仅剩一个面板，改为块布局 */
+  margin-top:20px;
+}
+
+/* 单一面板样式 */
+.results-panel{
+  background:#f8f9fa;
+  padding:15px;
+  border:1px solid #ddd;
+  border-radius:4px;
+  box-shadow:0 2px 6px rgba(0,0,0,.1);
+}
+
+/* ───────────── 4‑A. Search / Prediction list ───────────── */
+.text-result-item{margin-bottom:15px;}
+.text-result-item h3{margin-bottom:6px;}
+
+/* Clamp abstract to 2 lines */
+.abstract{
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+
+/* ───────────── 4‑B. Buttons inside list ────────────────── */
+.text-result-item button,
+#result-panel button{
+  margin-top:8px;
+  background:#007BFF;
+  color:#fff;
+  border:none;
+  padding:6px 12px;
+  cursor:pointer;
+  border-radius:4px;
+  transition:background .3s;
+}
+.text-result-item button:hover,
+#result-panel button:hover{
+  background:#0056b3;
+}
+
+/* ───────────── 5. Images (aggregate & prediction) ──────── */
+.responsive-img{
+  max-width:100%;
+  height:auto;
+  display:block;
+  margin:0 auto 10px;      /* centered with bottom gap */
+}
+
+/* Click‑to‑zoom */
+.responsive-img.enlarged{
+  transform:scale(1.8);
+  cursor:zoom-out;
+  transition:transform .3s;
+  z-index:1000;
+  position:relative;
+}
+
+/* ──────────────────── 7. Footer ───────────────────────── */
+footer{text-align:center;margin-top:20px;color:#777;font-size:.9em;}

@@ -72,14 +72,14 @@ cd src
 uvicorn api.api:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Example Query
+## Example Query for search API
 
 You can test the search API using curl:
 
 ```bash
 curl -s -X POST http://localhost:8000/search \
      -H "Content-Type: application/json" \
-     -d '{"query": "machine learning", "top_k": 5}'
+     -d '{"query": "machine learning", "top_k": 3}'
 ```
 
 Sample Output:
@@ -88,42 +88,75 @@ Sample Output:
 {
   "results": [
     {
-      "id": "1703.05298",
-      "title": "Neural Networks for Beginners. A fast implementation in Matlab, Torch,\n  TensorFlow",
-      "abstract": "  This report provides an introduction to some Machine Learning tools within\nthe most common development environments. It mainly focuses on practical\nproblems, skipping any theoretical introduction. It is oriented to both\nstudents trying to approach Machine Learning and experts looking for new\nframeworks.\n",
-      "distance": 0.7146506309509277
+      "title": "Machine Learning: When and Where the Horses Went Astray?",
+      "abstract": "  Machine Learning is usually defined as a subfield of AI, which is busy with\ninformation extraction from raw data sets. Despite of its common acceptance and\nwidespread recognition, this definition is wrong and groundless. Meaningful\ninformation does not belong to the data that bear it. It belongs to the\nobservers of the data and it is a shared agreement and a convention among them.\nTherefore, this private information cannot be extracted from the data by any\nmeans. Therefore, all further attempts of Machine Learning apologists to\njustify their funny business are inappropriate.\n",
+      "authors": "Emanuel Diamant",
+      "update_date": "2009-11-10",
+      "similarity": 0.9022916555404663
     },
     {
-      "id": "0810.4752",
-      "title": "Statistical Learning Theory: Models, Concepts, and Results",
-      "abstract": "  Statistical learning theory provides the theoretical basis for many of\ntoday's machine learning algorithms. In this article we attempt to give a\ngentle, non-technical overview over the key ideas and insights of statistical\nlearning theory. We target at a broad audience, not necessarily machine\nlearning researchers. This paper can serve as a starting point for people who\nwant to get an overview on the field before diving into technical details.\n",
-      "distance": 0.7291119694709778
+      "title": "Proceedings of the 29th International Conference on Machine Learning\n  (ICML-12)",
+      "abstract": "  This is an index to the papers that appear in the Proceedings of the 29th\nInternational Conference on Machine Learning (ICML-12). The conference was held\nin Edinburgh, Scotland, June 27th - July 3rd, 2012.\n",
+      "authors": "John Langford and Joelle Pineau (Editors)",
+      "update_date": "2012-09-18",
+      "similarity": 0.901700496673584
     },
     {
-      "id": "2302.05449",
-      "title": "Heckerthoughts",
-      "abstract": "  This manuscript is technical memoir about my work at Stanford and Microsoft\nResearch. Included are fundamental concepts central to machine learning and\nartificial intelligence, applications of these concepts, and stories behind\ntheir creation.\n",
-      "distance": 0.7660136222839355
-    },
-    {
-      "id": "2409.10304",
-      "title": "Spiers Memorial Lecture: How to do impactful research in artificial\n  intelligence for chemistry and materials science",
-      "abstract": "  Machine learning has been pervasively touching many fields of science.\nChemistry and materials science are no exception. While machine learning has\nbeen making a great impact, it is still not reaching its full potential or\nmaturity. In this perspective, we first outline current applications across a\ndiversity of problems in chemistry. Then, we discuss how machine learning\nresearchers view and approach problems in the field. Finally, we provide our\nconsiderations for maximizing impact when researching machine learning for\nchemistry.\n",
-      "distance": 0.7806453704833984
-    },
-    {
-      "id": "1405.1304",
-      "title": "Application of Machine Learning Techniques in Aquaculture",
-      "abstract": "  In this paper we present applications of different machine learning\nalgorithms in aquaculture. Machine learning algorithms learn models from\nhistorical data. In aquaculture historical data are obtained from farm\npractices, yields, and environmental data sources. Associations between these\ndifferent variables can be obtained by applying machine learning algorithms to\nhistorical data. In this paper we present applications of different machine\nlearning algorithms in aquaculture applications.\n",
-      "distance": 0.8109275102615356
+      "title": "Classic machine learning methods",
+      "abstract": "  In this chapter, we present the main classic machine learning methods. A\nlarge part of the chapter is devoted to supervised learning techniques for\nclassification and regression, including nearest-neighbor methods, linear and\nlogistic regressions, support vector machines and tree-based algorithms. We\nalso describe the problem of overfitting as well as strategies to overcome it.\nWe finally provide a brief overview of unsupervised learning methods, namely\nfor clustering and dimensionality reduction.\n",
+      "authors": "Johann Faouzi and Olivier Colliot",
+      "update_date": "2023-10-19",
+      "similarity": 0.8963815569877625
     }
   ],
   "aggregated_metrics": {
-    "avg_distance": 0.760269820690155,
-    "result_count": 5
+    "avg_similarity": 0.9001245697339376,
+    "result_count": 3
   }
 }
 ```
+
+## Example Query for aggregate_by_year API
+```bash
+curl -s -X POST http://localhost:8000/search/aggregate_by_year \
+     -H "Content-Type: application/json" \
+     -d '{"query": "machine learning"}'
+```
+
+Sample Output:
+
+```json
+{"year_counts":[82,30,50,66,67,142,166,251,328,412,499,689,884,1124,1166,1088,1157,1374]}
+```
+
+## Example Query for search aggregate plot
+```bash
+curl -s -X POST http://localhost:8000/search/aggregate_by_year \
+     -H "Content-Type: application/json" \
+     -d '{"query": "Cloud Computing and Resource Management"}'
+```
+
+Sample Output:
+![Search Aggregation Plot](/docs/images/aggregate_plot.png)
+
+
+## Example Query for prediction  plot
+```bash
+curl -s -X POST http://localhost:8000/search/aggregate_by_year \
+     -H "Content-Type: application/json" \
+     -d '{"query": "Cloud Computing and Resource Management"}'
+```
+
+Sample Output:
+![Search Aggregation Plot](/docs/images/prediction_demo.png)
+
+## Frontend
+```bash
+cd frontend
+python -m http.server 8001
+```
+http://localhost:8001/index.html
+
 
 # Generate research areas with LLM
 This step was performed on PACE ICE. To perform this step, first install required conda environment using `/other_requirements/generate_areas_llm_environment.yml`. Then, you can run the following two commands:

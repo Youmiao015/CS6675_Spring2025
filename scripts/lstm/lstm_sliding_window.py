@@ -218,12 +218,13 @@ def run_pipeline(args, config_file, timestamp, disable_progress_bar=False):
     bert_model.to(DEVICE)
 
     # Define window size
-    window_size = args.window_size
+    window_size = args.window_size if hasattr(args, 'window_size') else 12
 
     # Load training data with sliding window
     print("Loading training data with sliding window...")
     train_ts, train_texts, train_targets = load_data_from_csv_sliding(
-        'data/train_data_new.csv', args.preprocessing, window_size)
+        'data/train_data_new.csv', args.preprocessing, window_size,
+        cutoff_year=2022)  # Use data up to 2022 for training
     
     # Load validation data with fixed window (target: 2023)
     print("Loading validation data with fixed window...")

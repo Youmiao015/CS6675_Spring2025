@@ -12,7 +12,7 @@ from lstm_sliding_window import run_pipeline, parse_args, get_text_model_name, g
 parser = argparse.ArgumentParser(description='Hyperparameter Tuning for LSTM Late Fusion Model')
 parser.add_argument('--preprocessing', type=str, choices=['log', 'minmax'], default='minmax',
                     help='Preprocessing method: "log" for log1p + min-max scaling, "minmax" for just min-max scaling')
-parser.add_argument('--embedding_model', type=str, choices=['distilbert', 'e5'], default='distilbert',
+parser.add_argument('--embedding_model', type=str, choices=['distilbert', 'e5'], default='e5',
                     help='Embedding model to use: "distilbert" for distilbert-base-uncased, "e5" for intfloat/multilingual-e5-large-instruct')
 parser.add_argument('--worker_id', type=str, default='worker1', help='Worker ID for distributed tuning')
 parser.add_argument('--gpu_id', type=int, default=0, help='GPU ID to use')

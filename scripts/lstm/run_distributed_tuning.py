@@ -24,7 +24,7 @@ def parse_args():
                         help='Embedding model to use')
     parser.add_argument('--gpu_ids', type=str, default='0,1', help='Comma-separated list of GPU IDs to use')
     parser.add_argument('--cpu_cores', type=int, default=128, help='Number of CPU cores available')
-    parser.add_argument('--memory_per_trial', type=int, default=4, help='Memory per trial in GB')
+    parser.add_argument('--memory_per_trial', type=int, default=3.5, help='Memory per trial in GB')
     parser.add_argument('--pruning', action='store_true', help='Enable pruning of unpromising trials')
     return parser.parse_args()
 
@@ -108,7 +108,7 @@ def run_worker(worker_id, gpu_id, args, resources):
     
     # Build the command to run the tuning script
     cmd = [
-        'python', 'scripts/tune_hyperparameters.py',
+        'python', 'scripts/lstm/tune_hyperparameters.py',
         '--preprocessing', args.preprocessing,
         '--worker_id', str(worker_id),
         '--gpu_id', '0',  # The worker will see only one GPU (the one specified by CUDA_VISIBLE_DEVICES)

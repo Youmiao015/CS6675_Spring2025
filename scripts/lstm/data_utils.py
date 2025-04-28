@@ -90,14 +90,6 @@ GLOBAL_YEAR_RANGE = {
     'max': 2027
 }
 
-# Global statistics for features that need global standardization
-GLOBAL_STATS = {
-    'slope': {
-        'mean': None,
-        'std': None
-    }
-}
-
 def rolling_slope(series, window=3):
     """
     Compute the slope (trend) at each timestep using local linear regression.
@@ -130,39 +122,6 @@ def rolling_slope(series, window=3):
 
     return slopes
 
-def precompute_global_stats(file_path, preprocessing_type):
-    """Precompute global statistics for features that need global standardization.
-    This should be called before loading any data.
-    """
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Data file not found: {file_path}")
-    
-    # Read CSV file
-    df = pd.read_csv(file_path)
-    
-    # Extract all year columns (excluding 'topic')
-    year_columns = [col for col in df.columns if col != 'topic']
-    all_years = sorted(year_columns)  # Ensure years are in order
-    
-    # Calculate slopes for all time series
-    all_slopes = []
-    for _, row in df.iterrows():
-        values = row[all_years].values
-        if preprocessing_type == 'log':
-            values = np.log1p(values)
-        
-        # Calculate rolling slopes for each time step
-        rolling_slopes = rolling_slope(values, window=3)
-        all_slopes.extend(rolling_slopes)
-    
-    # Convert to numpy array and remove any NaN or infinite values
-    all_slopes = np.array(all_slopes)
-    all_slopes = all_slopes[~np.isnan(all_slopes) & ~np.isinf(all_slopes)]
-    
-    # Calculate global statistics for slope
-    GLOBAL_STATS['slope']['mean'] = np.mean(all_slopes)
-    GLOBAL_STATS['slope']['std'] = np.std(all_slopes)
-
 def create_time_features(input_years, ts_data, feature_configs=None):
     """Helper function to create time-based features.
     
@@ -183,7 +142,7 @@ def create_time_features(input_years, ts_data, feature_configs=None):
             },
             'slope': {
                 'scale_method': 'standardize',
-                'scale_global': True
+                'scale_global': False
             }
         }
     
@@ -254,21 +213,23 @@ def create_time_features(input_years, ts_data, feature_configs=None):
             # Calculate rolling slope for each time step
             slopes[row_idx] = rolling_slope(ts_data[row_idx], window=3)
         
-        if config['scale_global']:
-            slopes = (slopes - GLOBAL_STATS['slope']['mean']) / (GLOBAL_STATS['slope']['std'] + 1e-8)
-        else:
-            slopes = standardize(slopes)
+        # Standardize slopes per window
+        slopes = standardize(slopes)
         
         # Reshape to match the expected format (samples, time_steps, features)
         features['slope'] = slopes.reshape(ts_data.shape[0], -1, 1)
     return features
 
-def load_data_from_csv_sliding(file_path, preprocessing_type, window_size=10, use_features=None):
-    """Load data with sliding window, optionally including additional features."""
-    # Precompute global statistics if needed
-    if use_features and 'slope' in use_features:
-        precompute_global_stats(file_path, preprocessing_type)
+def load_data_from_csv_sliding(file_path, preprocessing_type, window_size=10, use_features=None, cutoff_year=2022):
+    """Load data with sliding window, optionally including additional features.
     
+    Args:
+        file_path: Path to the CSV file
+        preprocessing_type: Type of preprocessing to apply
+        window_size: Size of the sliding window
+        use_features: List of additional features to include
+        cutoff_year: Year to cut off the sliding window (inclusive). Windows will not include years after this.
+    """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Data file not found: {file_path}")
     
@@ -282,6 +243,9 @@ def load_data_from_csv_sliding(file_path, preprocessing_type, window_size=10, us
     year_columns = [col for col in df.columns if col != 'topic']
     all_years = sorted(year_columns)  # Ensure years are in order
     
+    # Filter years up to cutoff_year
+    all_years = [year for year in all_years if int(year) <= cutoff_year]
+    
     # Prepare sliding window data
     ts_data_list = []
     topics_list = []
@@ -292,26 +256,17 @@ def load_data_from_csv_sliding(file_path, preprocessing_type, window_size=10, us
         input_years = all_years[i:i+window_size]
         target_year = all_years[i+window_size]
         
+        # Skip if target year is after cutoff_year
+        if int(target_year) > cutoff_year:
+            continue
+            
         # Get input and target data
         window_ts_data = df[input_years].values
         window_targets = df[target_year].values
 
-        if i == 0:
-            print(f"\nWindow {i} Debug Info:")
-            print(f"Input Years: {input_years}")
-            print(f"Target Year: {target_year}")
-            print(f"Raw Time Series Data (first sample):\n{window_ts_data[0]}")
-        
         # Create features using raw data
         if use_features:
             features = create_time_features(input_years, window_ts_data)
-            
-            # Print example of features for first window
-            # if i == 0:
-            #     print("\nFeatures (first sample):")
-            #     for feature_name, feature_data in features.items():
-            #         print(f"{feature_name} shape: {feature_data.shape}")
-            #         print(f"{feature_name}:\n{feature_data[0]}")
         
         # Apply preprocessing to input data
         window_ts_data_processed = preprocess_time_series(window_ts_data, preprocessing_type)
@@ -333,16 +288,6 @@ def load_data_from_csv_sliding(file_path, preprocessing_type, window_size=10, us
             
             # Combine time series data with features
             window_ts_data_with_features = np.concatenate([window_ts_data_reshaped] + feature_list, axis=2)
-            
-            # Print complete LSTM input for first sample
-            if i == 0:
-                print("\nComplete LSTM Input (first sample):")
-                print(f"Shape: {window_ts_data_with_features[0].shape}")
-                print("Time Series Data:")
-                print(window_ts_data_with_features[0, :, 0])
-                for j, feature_name in enumerate(use_features, 1):
-                    print(f"\n{feature_name}:")
-                    print(window_ts_data_with_features[0, :, j])
         else:
             window_ts_data_with_features = window_ts_data_reshaped
         
@@ -361,16 +306,13 @@ def load_data_from_csv_sliding(file_path, preprocessing_type, window_size=10, us
         combined_topics.extend(topic_list)
     
     print(f"\nCreated {len(ts_data_list)} windows, total samples: {combined_ts_data.shape[0]}")
+    print(f"Using years up to {cutoff_year} for sliding window training")
     
     return combined_ts_data, combined_topics, combined_targets
 
 # Function to load and preprocess data from CSV without sliding window
 def load_data_from_csv_no_sliding(file_path, preprocessing_type, input_years, target_year, use_features=None):
     """Load data without sliding window, optionally including additional features."""
-    # Precompute global statistics if needed
-    if use_features and 'slope' in use_features:
-        precompute_global_stats(file_path, preprocessing_type)
-    
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Data file not found: {file_path}")
     

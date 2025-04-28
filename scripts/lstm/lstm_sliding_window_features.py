@@ -54,12 +54,14 @@ class TimeSeriesWithTextModel(nn.Module):
         self.fc1 = nn.Linear(lstm_hidden_dim + text_dim, fc_hidden_dim)
         self.fc2 = nn.Linear(fc_hidden_dim, 1)
         self.dropout = nn.Dropout(dropout_rate)
+        self.relu = nn.ReLU()  # Added ReLU layer
 
     def forward(self, ts_input, text_vector):
         lstm_out, _ = self.lstm(ts_input)
         last_hidden = lstm_out[:, -1, :]
         combined = torch.cat([last_hidden, text_vector], dim=1)
         x = self.fc1(combined)
+        x = self.relu(x)  # Apply ReLU activation
         x = self.dropout(x)
         output = self.fc2(x)
         return output.squeeze(-1)
@@ -221,13 +223,14 @@ def run_pipeline(args, config_file, timestamp, disable_progress_bar=False):
     bert_model.to(DEVICE)
 
     # Define window size
-    window_size = args.window_size
+    window_size = args.window_size if hasattr(args, 'window_size') else 12
 
     # Load training data with sliding window
     print("Loading training data with sliding window...")
     train_ts, train_texts, train_targets = load_data_from_csv_sliding(
         'data/train_data_new.csv', args.preprocessing, window_size, 
-        use_features=args.features)
+        use_features=args.features,
+        cutoff_year=2022)  # Use data up to 2022 for training
     
     # Load validation data with fixed window (target: 2023)
     print("Loading validation data with fixed window...")
@@ -359,7 +362,7 @@ if __name__ == "__main__":
                 },
                 'slope': {
                     'scale_method': 'standardize',
-                    'scale_global': True
+                    'scale_global': False
                 }
             }
         }

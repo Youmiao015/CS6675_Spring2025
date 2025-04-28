@@ -1,0 +1,38 @@
+{
+    "timestamp": "20250411_131512",
+    "preprocessing": "minmax",
+    "embedding_model": "e5",
+    "text_model_name": "intfloat/multilingual-e5-large-instruct",
+    "window_size": 12,
+    "text_dim": 1024,
+    "lstm_hidden_dim": 64,
+    "fc_hidden_dim": 64,
+    "dropout_rate": 0.3,
+    "batch_size": 16,
+    "epochs": 20,
+    "learning_rate": 0.00433,
+    "weight_decay": 9.3385e-06,
+    "early_stopping_patience": 7,
+    "device": "cuda",
+    "features": {
+        "used_features": [
+            "year_index",
+            "pct_change",
+            "slope"
+        ],
+        "configurations": {
+            "year_index": {
+                "scale_method": "minmax",
+                "scale_global": true
+            },
+            "pct_change": {
+                "scale_method": "standardize",
+                "scale_global": false
+            },
+            "slope": {
+                "scale_method": "standardize",
+                "scale_global": false
+            }
+        }
+    }
+}
